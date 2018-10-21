@@ -30,7 +30,7 @@ class QLearner:
         self.old_state = state
 
     def get_action(self, state):
-        explore = True if random.random() <= self.epsilon else False
+        explore = True if random.random() <= self.eps else False
         if explore:
             return random.randint(0, self.num_actions)
 

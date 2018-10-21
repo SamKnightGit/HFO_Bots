@@ -45,13 +45,12 @@ if __name__ == '__main__':
         Proximity to said opponent, CLOSE or FAR or OUT     -- 3
          
 
-    OUT proximity refers to outside of the quartile the player
-    is currently in (not a worry).
+    OUT proximity refers to outside of the quartile of the player
     """
     NUM_STATES = 12 * 10 * args.numTeammates * 3 * args.numOpponents
 
-    # Shoot, Pass or Dribble
-    NUM_ACTIONS = 3
+    # Shoot, Pass to one of N teammates or Dribble
+    NUM_ACTIONS = 2 + args.numTeammates
 
     hfo = HFOEnvironment()
     hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
