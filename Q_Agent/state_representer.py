@@ -1,6 +1,6 @@
 import numpy as np
 
-def get_representation(state_arr, num_teammates, num_opponents):
+def get_representation(state_arr, num_teammates):
     """
     :param state_arr: Array of raw state returned from the HFO environment
     :param num_teammates: Used for indexing in the raw state array
@@ -23,14 +23,43 @@ def get_representation(state_arr, num_teammates, num_opponents):
             'team_y': state_arr[index+4],
             'uniform_num': state_arr[index+5]
         }
+    index = 0
+    previous_size = 0
 
-    position = position_finder(agent_x, agent_y)
+    position, in_goal_region = position_finder(agent_x, agent_y)
 
+    index += position
+    previous_size += 4
 
-    if prox_opponent < 0.7:
-        close_to_opp = 1
-    else:
-        close_to_opp = 2
+    index += in_goal_region * previous_size
+    previous_size += 2
+
+    if abs(goal_angle) > 0.2:
+        index += previous_size
+    previous_size += 2
+
+    if prox_opponent > 0.7:
+        index += previous_size
+    previous_size += 2
+
+    for teammate in teammates.keys():
+        further_than_agent, close_to_opp, pass_angle, goal_angle = \
+            get_teammate_metrics(np.array([agent_x, agent_y]), teammates[teammate])
+
+        if further_than_agent:
+            index += previous_size
+        previous_size += 2
+
+        index += (previous_size * close_to_opp)
+        previous_size += 3
+
+        index += (previous_size * pass_angle)
+        previous_size += 3
+
+        index += (previous_size * goal_angle)
+        previous_size += 3
+
+    return index
 
 def position_finder(x_pos, y_pos):
     """
@@ -43,10 +72,10 @@ def position_finder(x_pos, y_pos):
     :rtype: int
     """
     pos_grid = np.zeros((2,2))
-    in_goal_region = 1
+    in_goal_region = 0
     y_pos = abs(y_pos)
     if x_pos > 0:
-        in_goal_region = 2
+        in_goal_region = 1
         if x_pos > 0.5:
             if y_pos > 0.5:
                 pos_grid[1][1] = 1.0
@@ -69,7 +98,7 @@ def position_finder(x_pos, y_pos):
             else:
                 pos_grid[0][0] = 1.0
 
-    return (np.nonzero(pos_grid) + 1) * in_goal_region
+    return np.nonzero(pos_grid), in_goal_region
 
 
 def get_teammate_metrics(agent_pos, teammate):
@@ -90,36 +119,36 @@ def get_teammate_metrics(agent_pos, teammate):
     team_dist = np.linalg.norm(teammate_pos-goal_pos)
     agent_dist = np.linalg.norm(agent_pos-goal_pos)
 
-    further_than_agent = 2
+    further_than_agent = 1
     if team_dist < agent_dist:
-        further_than_agent = 1
+        further_than_agent = 0
 
-    close_to_opp = 3
+    close_to_opp = 2
     prox_opponent = teammate['prox_opponent']
     if prox_opponent != -2:
         if prox_opponent < 0.7:
-            close_to_opp = 1
+            close_to_opp = 0
         else:
-            close_to_opp = 2
+            close_to_opp = 1
 
     # TODO: Understand what angles make sense
-    pass_angle = 3
+    pass_angle = 2
     p_angle = teammate['pass_angle']
     if p_angle != -2:
         if abs(p_angle) < 0.2:
-            pass_angle = 1
+            pass_angle = 0
         else:
-            pass_angle = 2
+            pass_angle = 1
 
-    goal_angle = 3
+    goal_angle = 2
     g_angle = teammate['goal_angle']
     if g_angle != -2:
         if abs(g_angle) < 0.2 :
-            goal_angle = 1
+            goal_angle = 0
         else:
-            goal_angle = 2
+            goal_angle = 1
 
-    return (further_than_agent * close_to_opp * pass_angle * goal_angle)
+    return further_than_agent, close_to_opp, pass_angle, goal_angle
 
 
 
