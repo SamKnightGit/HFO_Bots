@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def get_representation(state_arr, num_teammates):
     """
     :param state_arr: Array of raw state returned from the HFO environment
@@ -23,6 +24,7 @@ def get_representation(state_arr, num_teammates):
             'team_y': state_arr[index+4],
             'uniform_num': state_arr[index+5]
         }
+
     index = 0
     previous_size = 0
 
@@ -98,7 +100,7 @@ def position_finder(x_pos, y_pos):
             else:
                 pos_grid[0][0] = 1.0
 
-    return np.nonzero(pos_grid), in_goal_region
+    return np.flatnonzero(pos_grid)[0], in_goal_region
 
 
 def get_teammate_metrics(agent_pos, teammate):

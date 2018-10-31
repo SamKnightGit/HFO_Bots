@@ -1,7 +1,7 @@
 from hfo import *
 import argparse
-from .q_learner import QLearner
-
+from q_learner import QLearner
+import state_representer
 
 
 # Taken from: high_level_sarsa_agent.py in HFO repo
@@ -34,20 +34,18 @@ if __name__ == '__main__':
     """ States explained as follows:
     4 states for location in quartile                       -- 4
     1 boolean state if quartile is near goal                -- 2
-    Goal scoring angle, SMALL or MED or LARGE               -- 3
-    Goal scoring proximity, CLOSE or FAR or OUT             -- 3
+    Goal scoring angle, SMALL or LARGE                      -- 2
+    Opponent proximity, CLOSE or FAR                        -- 2
     For each Teammate:
         1 boolean state if closer to goal than player       -- 2
         Proximity to opponent, CLOSE or FAR                 -- 2
         Pass opening angle, SMALL or LARGE or INVALID       -- 3
         Goal scoring angle, SMALL or LARGE or INVALID       -- 3
-    For each Opponent:
-        Proximity to said opponent, CLOSE or FAR or OUT     -- 3
          
 
     OUT proximity refers to outside of the quartile of the player
     """
-    NUM_STATES = 12 * 10 * args.numTeammates * 3 * args.numOpponents
+    NUM_STATES = 32 * (36 ** args.numTeammates)
 
     # Shoot, Pass to one of N teammates or Dribble
     NUM_ACTIONS = 2 + args.numTeammates
@@ -59,14 +57,36 @@ if __name__ == '__main__':
 
     for episode in range(0, args.numEpisodes):
         status = IN_GAME
+        action = None
+        state = None
+        timestep = 0
         while status == IN_GAME:
+            timestep += 1
             features = hfo.getState()
             if int(features[5] != 1):
                 hfo.act(MOVE)
             else:
-                pass
-            hfo.act(DRIBBLE)
+                state = state_representer.get_representation(features, args.numTeammates)
+                if action:
+                    reward = get_reward(status)
+                    q_learner.update(state, action, reward)
+                action = q_learner.get_action(state)
+
+                if action == 0:
+                    hfo.act(DRIBBLE)
+                elif action == 1:
+                    hfo.act(SHOOT)
+                elif args.numTeammates > 0:
+                    hfo.act(PASS, 15 + 6 * action)
             status = hfo.step()
+
+        if action and state:
+            reward = get_reward(status)
+            q_learner.update(state, action, reward)
+
         if status == SERVER_DOWN:
             hfo.act(QUIT)
-            exit()
+            q_learner.save()
+            break
+
+    q_learner.save()

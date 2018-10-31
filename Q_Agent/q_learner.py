@@ -1,8 +1,9 @@
 import numpy as np
 import random
 
+
 class QLearner:
-    def __init__(self, num_states=0, num_actions=0, epsilon=0.01, learning_rate=0.1, discount_factor=0.9,  q_table_in=None, q_table_out=None):
+    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.1, discount_factor=0.9,  q_table_in=None, q_table_out=None):
         self.num_states = num_states
         self.num_actions = num_actions
         self.eps = epsilon
@@ -35,6 +36,15 @@ class QLearner:
             return random.randint(0, self.num_actions)
 
         return np.argmax(self.q_table[state])
+
+    def adjust_epsilon(self, timestep):
+        """
+        Adjust epsilon used for decreasing exploration after agent has been sufficiently trained
+
+        :param int timestep: Timestep of game
+        """
+        # TODO: Find a more suitable function for annealing epsilon
+        self.eps = 1 / 1 + timestep
 
     def save(self):
         np.save(self.table_out, self.q_table)
