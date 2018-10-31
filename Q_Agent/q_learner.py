@@ -1,5 +1,4 @@
 import numpy as np
-import random
 
 
 class QLearner:
@@ -24,16 +23,14 @@ class QLearner:
 
     def update(self, state, action, reward):
         if self.old_state:
-            self.q_table[self.old_state, action] = \
-                (1 - self.learn_rate) * self.q_table[self.old_state, action] + \
-                self.learn_rate * (reward + self.discount * np.amax(self.q_table[state]))
-
+            self.q_table[self.old_state, action] *= (1 - self.learn_rate) 
+            self.q_table[self.old_state, action] += self.learn_rate * (reward + self.discount * np.amax(self.q_table[state]))
         self.old_state = state
 
     def get_action(self, state):
-        explore = True if random.random() <= self.eps else False
+        explore = True if np.random.random() <= self.eps else False
         if explore:
-            return random.randint(0, self.num_actions)
+            return np.random.randint(0, self.num_actions)
 
         return np.argmax(self.q_table[state])
 
@@ -45,6 +42,9 @@ class QLearner:
         """
         # TODO: Find a more suitable function for annealing epsilon
         self.eps = 1 / 1 + timestep
+
+    def clear(self):
+        self.old_state = None
 
     def save(self):
         np.save(self.table_out, self.q_table)

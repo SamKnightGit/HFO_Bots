@@ -6,6 +6,9 @@ __pycache__/
 #PyCharm stuff
 .idea/
 
+# Ignore the logs from the q_learning agents
+logs/
+
 # C extensions
 *.so
 

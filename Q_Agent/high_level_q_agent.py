@@ -1,5 +1,6 @@
 from hfo import *
 import argparse
+import os
 from q_learner import QLearner
 import state_representer
 
@@ -31,6 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--numEpisodes', type=int, default=1)
     args = parser.parse_args()
 
+
     """ States explained as follows:
     4 states for location in quartile                       -- 4
     1 boolean state if quartile is near goal                -- 2
@@ -53,7 +55,8 @@ if __name__ == '__main__':
     hfo = HFOEnvironment()
     hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
 
-    q_learner = QLearner(NUM_STATES, NUM_ACTIONS, q_table_out='/logs/first_table.npy')
+    logs_dir = os.path.dirname(os.path.realpath(__file__))
+    q_learner = QLearner(NUM_STATES, NUM_ACTIONS, q_table_out=logs_dir + '/logs/q_learner.npy')
 
     for episode in range(0, args.numEpisodes):
         status = IN_GAME
@@ -83,10 +86,11 @@ if __name__ == '__main__':
         if action and state:
             reward = get_reward(status)
             q_learner.update(state, action, reward)
+            q_learner.clear()
 
         if status == SERVER_DOWN:
             hfo.act(QUIT)
             q_learner.save()
             break
-
+            
     q_learner.save()
