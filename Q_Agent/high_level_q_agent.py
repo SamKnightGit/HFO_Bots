@@ -30,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--numTeammates', type=int, default=1)
     parser.add_argument('--numOpponents', type=int, default=1)
     parser.add_argument('--numEpisodes', type=int, default=1)
+    parser.add_argument('--playerIndex', type=int, default=1)
     args = parser.parse_args()
 
 
@@ -56,7 +57,9 @@ if __name__ == '__main__':
     hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
 
     logs_dir = os.path.dirname(os.path.realpath(__file__))
-    q_learner = QLearner(NUM_STATES, NUM_ACTIONS, q_table_out=logs_dir + '/logs/q_learner.npy')
+    q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
+                         q_table_in = logs_dir + '/logs/q_learner' + str(args.playerIndex) + '.npy',
+                         q_table_out=logs_dir + '/logs/q_learner' + str(args.playerIndex) + '.npy')
 
     for episode in range(0, args.numEpisodes):
         status = IN_GAME
@@ -80,7 +83,7 @@ if __name__ == '__main__':
                 elif action == 1:
                     hfo.act(SHOOT)
                 elif args.numTeammates > 0:
-                    hfo.act(PASS, 15 + 6 * action)
+                    hfo.act(PASS, 15 + 6 * (action-2))
             status = hfo.step()
 
         if action and state:
