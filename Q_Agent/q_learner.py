@@ -5,7 +5,8 @@ class QLearner:
     def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.1, discount_factor=0.9,  q_table_in=None, q_table_out=None):
         self.num_states = num_states
         self.num_actions = num_actions
-        self.eps = epsilon
+        self.original_eps = epsilon
+        self.current_eps = epsilon
         self.learn_rate = learning_rate
         self.discount = discount_factor
         self.table_out = q_table_out
@@ -47,7 +48,7 @@ class QLearner:
         # Assemble valid actions range
         valid_actions = self.num_actions - valid_teammates.count(0)
 
-        explore = True if np.random.random() <= self.eps else False
+        explore = True if np.random.random() <= self.current_eps else False
         if explore:
             random_action = np.random.randint(0, valid_actions)
             if random_action >= 2:
@@ -56,7 +57,6 @@ class QLearner:
                                    in enumerate(valid_teammates)
                                    if teammate_valid == 1][teammate_chosen]
                 random_action = 2 + passable_teammate
-                print("PASS TO: ", random_action)
             return random_action
 
         return np.argmax(self.q_table[state])
@@ -67,8 +67,8 @@ class QLearner:
 
         :param int timestep: Timestep of game
         """
-        # TODO: Find a more suitable function for annealing epsilon
-        self.eps = 1 / 1 + timestep
+        if not self.current_eps <= 0.01: # lower limit of epsilon
+            self.current_eps = self.original_eps * (1 / np.log10(timestep + 10))
 
     def clear(self):
         self.old_state = None
