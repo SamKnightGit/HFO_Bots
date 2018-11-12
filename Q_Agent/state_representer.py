@@ -44,12 +44,15 @@ def get_representation(state_arr, num_teammates):
         index += previous_size
     previous_size += 2
 
+    valid_teammates = [0] * num_teammates
     for teammate in teammates.keys():
-        further_than_agent, close_to_opp, pass_angle, goal_angle = \
+        valid, further_than_agent, close_to_opp, pass_angle, goal_angle = \
             get_teammate_metrics(np.array([agent_x, agent_y]), teammates[teammate])
 
-        if further_than_agent:
-            index += previous_size
+        if valid:
+            valid_teammates[teammate] = 1
+
+        index += (previous_size * further_than_agent)
         previous_size += 2
 
         index += (previous_size * close_to_opp)
@@ -61,7 +64,7 @@ def get_representation(state_arr, num_teammates):
         index += (previous_size * goal_angle)
         previous_size += 3
 
-    return index
+    return index, valid_teammates
 
 def position_finder(x_pos, y_pos):
     """
@@ -114,12 +117,17 @@ def get_teammate_metrics(agent_pos, teammate):
     :param numpy.array agent_pos: Agent position
     :param dict teammate: Teammate information
     :return: Index into Q Table for teammate
-    :rtype: int
+    :rtype: (int, bool)
     """
     goal_pos = np.array([1.0, 0.0])
     teammate_pos = np.array([teammate['team_x'], teammate['team_y']])
     team_dist = np.linalg.norm(teammate_pos-goal_pos)
     agent_dist = np.linalg.norm(agent_pos-goal_pos)
+
+    if teammate_pos[0] == -2 or teammate_pos[1] == -2:
+        valid = False
+    else:
+        valid = True
 
     further_than_agent = 1
     if team_dist < agent_dist:
@@ -150,7 +158,7 @@ def get_teammate_metrics(agent_pos, teammate):
         else:
             goal_angle = 1
 
-    return further_than_agent, close_to_opp, pass_angle, goal_angle
+    return valid, further_than_agent, close_to_opp, pass_angle, goal_angle
 
 
 
