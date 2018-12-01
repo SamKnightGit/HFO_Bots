@@ -11,6 +11,7 @@ def get_representation(state_arr, num_teammates):
     """
     agent_x = state_arr[0]
     agent_y = state_arr[1]
+    ball_kickable = state_arr[5]
     goal_angle = state_arr[8]
     prox_opponent = state_arr[9]
     teammates = {}

@@ -14,7 +14,7 @@ class QLearner:
         if q_table_in:
             try:
                 self.q_table = np.load(q_table_in)
-            except IOError as ioe:
+            except (IOError, OSError) as ioe:
                 print("Error with file: " + q_table_in)
                 print(ioe.strerror)
                 print("Reinitializing Q Table")
@@ -24,8 +24,8 @@ class QLearner:
 
     def update(self, state, action, reward):
         if self.old_state:
-            self.q_table[self.old_state, action] *= (1 - self.learn_rate) 
-            self.q_table[self.old_state, action] += self.learn_rate * (reward + self.discount * np.amax(self.q_table[state]))
+            self.q_table[self.old_state][action] *= (1 - self.learn_rate)
+            self.q_table[self.old_state][action] += self.learn_rate * (reward + self.discount * np.amax(self.q_table[state]))
         self.old_state = state
 
     def set_invalid(self, state, invalid_teammates):
@@ -41,7 +41,7 @@ class QLearner:
         # if invalid actions have already been set do nothing.
         if not -np.inf in self.q_table[state]:
             for index in range(len(invalid_teammates)):
-                if invalid_teammates[index] == 0:
+                if invalid_teammates[index] == 0: # teammate invalid
                     self.q_table[state][2 + index] = -np.inf
 
     def get_action(self, state, valid_teammates):
@@ -59,6 +59,10 @@ class QLearner:
                 random_action = 2 + passable_teammate
             return random_action
 
+        max_list = np.where(self.q_table[state] == self.q_table[state].max())
+        if len(max_list) > 1:
+            random_action = np.random.randint(0, len(max_list))
+            return self.q_table[state][random_action]
         return np.argmax(self.q_table[state])
 
     def adjust_epsilon(self, timestep):
