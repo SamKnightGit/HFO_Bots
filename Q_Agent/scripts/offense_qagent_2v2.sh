@@ -15,7 +15,7 @@ do
 	sleep 10 
 	
 	# get relevant data from output 
-	python /home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/Q_Agent/scripts/trim_data.py
+	python ./example/custom_agents/HFO_Bots/Q_Agent/scripts/trim_data.py
 
 	trap "kill -TERM -$$" SIGINT
 done
