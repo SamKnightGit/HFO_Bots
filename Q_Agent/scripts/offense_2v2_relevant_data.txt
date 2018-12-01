@@ -1,0 +1,6 @@
+TotalFrames = 73, AvgFramesPerTrial = 73.0, AvgFramesPerGoal = 73.0
+Trials             : 1
+Goals              : 1
+Defense Captured   : 0
+Balls Out of Bounds: 0
+Out of Time        : 0
