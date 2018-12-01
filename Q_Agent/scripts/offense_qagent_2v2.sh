@@ -12,7 +12,7 @@ do
 	python ./example/custom_agents/HFO_Bots/Q_Agent/high_level_q_agent.py --playerIndex=1 --numEpisodes=$2 &> agent1.txt &
 	sleep 5
 	python ./example/custom_agents/HFO_Bots/Q_Agent/high_level_q_agent.py --playerIndex=2 --numEpisodes=$2 &> agent2.txt &
-	sleep 5
+	sleep 10 
 	
 	# get relevant data from output 
 	python /home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/Q_Agent/scripts/trim_data.py
