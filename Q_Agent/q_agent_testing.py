@@ -5,24 +5,6 @@ from qlearner import QLearner
 import state_representer
 
 
-# Taken from: high_level_sarsa_agent.py in HFO repo
-def get_reward(s):
-    reward = 0
-
-    if s == GOAL:
-        reward = 1
-
-    elif s == CAPTURED_BY_DEFENSE:
-        reward = -1
-
-    elif s == OUT_OF_BOUNDS:
-        reward = -1
-
-    elif s == OUT_OF_TIME:
-        reward = -1
-
-    return reward
-
 def feature_printer(features, numTeammates, numOpponents):
     print("Player X Position: {0:.5f}".format(features[0]))
     print("Player Y Position: {0:.5f}".format(features[1]))
@@ -36,7 +18,7 @@ def feature_printer(features, numTeammates, numOpponents):
     print("Proximity to Opponent: {0:.5f}".format(features[9]))
     for teammate in range(numTeammates):
         print("Teammate {0} Goal Opening Angle: {1:.5f}".format(
-            teammate, features[10+6*teammate]))
+            teammate, features[10 + 6 * teammate]))
         print("Teammate {0} Opponent Proximity: {1:.5f}".format(
             teammate, features[11 + 6 * teammate]))
         print("Teammate {0} Pass Opening Angle: {1:.5f}".format(
@@ -57,8 +39,6 @@ def feature_printer(features, numTeammates, numOpponents):
     print("\n\n")
 
 
-
-
 if __name__ == '__main__':
     Q_TABLE_DIR = os.path.dirname(os.path.realpath(__file__)) + '/qtables/q_learner'
 
@@ -68,10 +48,8 @@ if __name__ == '__main__':
     parser.add_argument('--numOpponents', type=int, default=1)
     parser.add_argument('--numEpisodes', type=int, default=1)
     parser.add_argument('--playerIndex', type=int, default=1)
-    parser.add_argument('--inQTableDir', type=str, default=None)
-    parser.add_argument('--outQTableDir', type=str, default=Q_TABLE_DIR)
+    parser.add_argument('--qTableDir', type=str, default=Q_TABLE_DIR)
     args = parser.parse_args()
-
 
     """ States explained as follows:
     4 states for location in quartile                       -- 4
@@ -83,7 +61,7 @@ if __name__ == '__main__':
         Proximity to opponent, CLOSE or FAR                 -- 2
         Pass opening angle, SMALL or LARGE or INVALID       -- 3
         Goal scoring angle, SMALL or LARGE or INVALID       -- 3
-         
+
 
     OUT proximity refers to outside of the quartile of the player
     """
@@ -95,14 +73,9 @@ if __name__ == '__main__':
     hfo = HFOEnvironment()
     hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
 
-    if args.inQTableDir:
-        q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                             q_table_in=args.inQTableDir + str(args.playerIndex) + '.npy',
-                             q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
-    else:
-        q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                            q_table_in=args.outQTableDir + str(args.playerIndex) + '.npy',
-                            q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
+    q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
+                         q_table_in=args.qTableDir + str(args.playerIndex) + '.npy',
+                         q_table_out=args.qTableDir + str(args.playerIndex) + '.npy')
 
     for episode in range(0, args.numEpisodes):
         status = IN_GAME
@@ -123,10 +96,6 @@ if __name__ == '__main__':
                 if 0 in valid_teammates:
                     q_learner.set_invalid(state, valid_teammates)
 
-                if action is not None:
-                    reward = get_reward(status)
-                    q_learner.update(state, action, reward)
-
                 action = q_learner.get_action(state, valid_teammates)
 
                 if action == 0:
@@ -136,31 +105,9 @@ if __name__ == '__main__':
                     print("Action Taken: SHOOT \n")
                     hfo.act(SHOOT)
                 elif args.numTeammates > 0:
-                    print("Action Taken: PASS -> {0} \n".format(action-2))
-                    hfo.act(PASS, features[15 + 6 * (action-2)])
+                    print("Action Taken: PASS -> {0} \n".format(action - 2))
+                    hfo.act(PASS, features[15 + 6 * (action - 2)])
             status = hfo.step()
-
-        if action is not None and state is not None:
-            reward = get_reward(status)
-            if action == 0:
-                print("Dribble Action with reward {0} on state {1}".format(
-                    reward, state
-                ))
-            elif action == 1:
-                print("Shoot Action with reward {0} on state {1}".format(
-                    reward, state
-                ))
-            else:
-                print("Pass Action with reward {0} on state {1}".format(
-                    reward, state
-                ))
-            q_learner.update(state, action, reward)
-            q_learner.clear()
-            q_learner.save()
 
         if status == SERVER_DOWN:
             hfo.act(QUIT)
-            q_learner.save()
-            break
-            
-    q_learner.save()

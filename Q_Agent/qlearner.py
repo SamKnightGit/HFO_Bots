@@ -2,7 +2,8 @@ import numpy as np
 
 
 class QLearner:
-    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.1, discount_factor=0.9,  q_table_in=None, q_table_out=None):
+    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.1, discount_factor=0.9,
+                 q_table_in=None, q_table_out=None):
         self.num_states = num_states
         self.num_actions = num_actions
         self.original_eps = epsilon
@@ -12,13 +13,7 @@ class QLearner:
         self.table_out = q_table_out
         self.old_state = None
         if q_table_in:
-            try:
-                self.q_table = np.load(q_table_in)
-            except (IOError, OSError) as ioe:
-                print("Error with file: " + q_table_in)
-                print(ioe.strerror)
-                print("Reinitializing Q Table")
-                self.q_table = np.zeros((num_states, num_actions))
+            self.load(q_table_in)
         else:
             self.q_table = np.zeros((num_states, num_actions))
 
@@ -83,8 +78,10 @@ class QLearner:
     def load(self, q_table_in):
         try:
             self.q_table = np.load(q_table_in)
-        except IOError as ioe:
+        except (IOError, OSError) as ioe:
             print("Error with file: " + q_table_in)
             print(ioe.strerror)
+            print("Reinitializing Q Table")
+            self.q_table = np.zeros((self.num_states, self.num_actions))
 
 
