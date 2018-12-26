@@ -11,11 +11,11 @@ class QLearner:
         self.learn_rate = learning_rate
         self.discount = discount_factor
         self.table_out = q_table_out
-        self.old_state = None
         if q_table_in:
             self.load(q_table_in)
         else:
             self.q_table = np.zeros((num_states, num_actions))
+        self.old_state = None
 
     def update(self, state, action, reward):
         if self.old_state:
@@ -54,10 +54,12 @@ class QLearner:
                 random_action = 2 + passable_teammate
             return random_action
 
+        # If multiple equal q-values, pick randomly
         max_list = np.where(self.q_table[state] == self.q_table[state].max())
         if len(max_list) > 1:
             random_action = np.random.randint(0, len(max_list))
             return self.q_table[state][random_action]
+
         return np.argmax(self.q_table[state])
 
     def adjust_epsilon(self, timestep):
