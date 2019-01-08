@@ -97,12 +97,14 @@ if __name__ == '__main__':
 
     if args.inQTableDir:
         q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
+                             total_timesteps=args.numEpisodes,
                              q_table_in=args.inQTableDir + str(args.playerIndex) + '.npy',
                              q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
     else:
         q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                            q_table_in=args.outQTableDir + str(args.playerIndex) + '.npy',
-                            q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
+                             total_timesteps=args.numEpisodes,
+                             q_table_in=args.outQTableDir + str(args.playerIndex) + '.npy',
+                             q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
 
     for episode in range(0, args.numEpisodes):
         status = IN_GAME
@@ -115,7 +117,7 @@ if __name__ == '__main__':
             # Print off features in a readable manner
             # feature_printer(features, args.numTeammates, args.numOpponents)
 
-            if int(features[5] != 1):
+            if int(features[5]) != 1:
                 hfo.act(MOVE)
             else:
                 state, valid_teammates = state_representer.get_representation(features, args.numTeammates)

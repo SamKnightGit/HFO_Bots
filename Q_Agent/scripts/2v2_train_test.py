@@ -10,10 +10,10 @@ from tqdm import tqdm
 
 creation_time = datetime.isoformat(datetime.today())
 
-qtable_dir = os.path.dirname(os.path.realpath(__file__)) + '/../qtables/'
+qtable_dir = os.path.dirname(os.path.realpath(__file__)) + '/../qtables/'  # type: str
 qtable_dir += creation_time
 
-output_dir = os.path.dirname(os.path.realpath(__file__)) + '/../output/'
+output_dir = os.path.dirname(os.path.realpath(__file__)) + '/../output/'   # type: str
 output_dir += creation_time
 
 TRAIN_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/high_level_q_agent.py'
@@ -44,7 +44,7 @@ def train_2v2(num_iterations, trials_per_iteration, q_table_directory, output_di
         in_q_table_path = None
         if iteration != 0:
             in_q_table_path = q_table_directory + "/iter_" + str(iteration-1)
-        out_q_table_path = q_table_directory + "/iter_" + str(iteration)
+        out_q_table_path = q_table_directory + "/iter_" + str(iteration)  # type: str
         os.mkdir(out_q_table_path)
 
         # initialize q table files
