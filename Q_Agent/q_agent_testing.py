@@ -74,6 +74,7 @@ if __name__ == '__main__':
     hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
 
     q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
+                         start_epsilon=0.0,
                          q_table_in=args.qTableDir + str(args.playerIndex) + '.npy',
                          q_table_out=args.qTableDir + str(args.playerIndex) + '.npy')
 
@@ -81,6 +82,7 @@ if __name__ == '__main__':
         status = IN_GAME
         action = None
         state = None
+        history = []
         timestep = 0
         while status == IN_GAME:
             timestep += 1
@@ -89,8 +91,20 @@ if __name__ == '__main__':
             # feature_printer(features, args.numTeammates, args.numOpponents)
 
             if int(features[5] != 1):
+                history.append((features[0], features[1]))
+                if len(history) > 5:
+                    history.pop(0)
+
+                if len(history) == 5:
+                    if history[0][0] == history[4][0] and history[0][1] == history[4][1]:
+                        hfo.act(REORIENT)
+                        history = []
+                        continue
+
                 hfo.act(MOVE)
+
             else:
+                history = []
                 state, valid_teammates = state_representer.get_representation(features, args.numTeammates)
                 print("Valid Teammates: ", valid_teammates)
                 if 0 in valid_teammates:

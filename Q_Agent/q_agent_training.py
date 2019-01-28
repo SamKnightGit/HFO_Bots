@@ -23,6 +23,22 @@ def get_reward(s):
 
     return reward
 
+
+def reward_printer(state, action, reward):
+    if action == 0:
+        print("Dribble Action with reward {0} on state {1}".format(
+            reward, state
+        ))
+    elif action == 1:
+        print("Shoot Action with reward {0} on state {1}".format(
+            reward, state
+        ))
+    else:
+        print("Pass Action with reward {0} on state {1}".format(
+            reward, state
+        ))
+
+
 def feature_printer(features, numTeammates, numOpponents):
     print("Player X Position: {0:.5f}".format(features[0]))
     print("Player Y Position: {0:.5f}".format(features[1]))
@@ -67,6 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('--numTeammates', type=int, default=1)
     parser.add_argument('--numOpponents', type=int, default=1)
     parser.add_argument('--numEpisodes', type=int, default=1)
+    parser.add_argument('--epsilon', type=float, default=0.1)
     parser.add_argument('--playerIndex', type=int, default=1)
     parser.add_argument('--inQTableDir', type=str, default=None)
     parser.add_argument('--outQTableDir', type=str, default=Q_TABLE_DIR)
@@ -89,7 +106,7 @@ if __name__ == '__main__':
     """
     NUM_STATES = 32 * (36 ** args.numTeammates)
 
-    # Shoot, Pass to one of N teammates or Dribble
+    # Shoot, Dribble or Pass to one of N teammates or
     NUM_ACTIONS = 2 + args.numTeammates
 
     hfo = HFOEnvironment()
@@ -98,11 +115,13 @@ if __name__ == '__main__':
     if args.inQTableDir:
         q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
                              total_timesteps=args.numEpisodes,
+                             start_epsilon=args.epsilon,
                              q_table_in=args.inQTableDir + str(args.playerIndex) + '.npy',
                              q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
     else:
         q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
                              total_timesteps=args.numEpisodes,
+                             start_epsilon=args.epsilon,
                              q_table_in=args.outQTableDir + str(args.playerIndex) + '.npy',
                              q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
 
@@ -110,6 +129,7 @@ if __name__ == '__main__':
         status = IN_GAME
         action = None
         state = None
+        history = []
         timestep = 0
         while status == IN_GAME:
             timestep += 1
@@ -118,6 +138,17 @@ if __name__ == '__main__':
             # feature_printer(features, args.numTeammates, args.numOpponents)
 
             if int(features[5]) != 1:
+                history.append((features[0], features[1]))
+                if len(history) > 2:
+                    history.pop(0)
+
+                # ensures agent does not get stuck for prolonged periods
+                if len(history) == 2:
+                    if history[0][0] == history[1][0] and history[0][1] == history[1][1]:
+                        hfo.act(REORIENT)
+                        history = []
+                        continue
+
                 hfo.act(MOVE)
             else:
                 state, valid_teammates = state_representer.get_representation(features, args.numTeammates)
@@ -127,6 +158,7 @@ if __name__ == '__main__':
 
                 if action is not None:
                     reward = get_reward(status)
+                    reward_printer(state, action, reward)
                     q_learner.update(state, action, reward)
 
                 action = q_learner.get_action(state, valid_teammates)
@@ -144,18 +176,7 @@ if __name__ == '__main__':
 
         if action is not None and state is not None:
             reward = get_reward(status)
-            if action == 0:
-                print("Dribble Action with reward {0} on state {1}".format(
-                    reward, state
-                ))
-            elif action == 1:
-                print("Shoot Action with reward {0} on state {1}".format(
-                    reward, state
-                ))
-            else:
-                print("Pass Action with reward {0} on state {1}".format(
-                    reward, state
-                ))
+            reward_printer(state, action, reward)
             q_learner.update(state, action, reward)
             q_learner.clear()
             q_learner.save()

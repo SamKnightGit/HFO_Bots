@@ -12,17 +12,13 @@ with open(relevant_data, 'a+') as data_file:
 		training_in_progress = True
 		while training_in_progress:
 			final_line = subprocess.check_output(['tail', '-1', raw_data])
+			print(final_line)
 			if "[start.py]" in final_line:
 				training_in_progress = False
 			time.sleep(5)
-		relevant_data = False
-		for line in raw_file:
-			if relevant_data and "[start.py]" in line:
-				relevant_data = False
-			if "TotalFrames" in line:
-				relevant_data = True
-			if relevant_data:
-				data_file.write(line)
+		
+		results = subprocess.check_output(['tail', '-7', raw_data])
+		data_file.write(results)
 
 				
 		
