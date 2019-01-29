@@ -2,21 +2,11 @@ import numpy as np
 
 
 class QLearner:
-    def __init__(self, num_states=0, num_actions=0, start_epsilon=0.10, end_epsilon=0.01, annealing_function='lin',
-                 total_timesteps=1000, learning_rate=0.1, discount_factor=0.9, q_table_in=None, q_table_out=None):
+    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.1,
+                 discount_factor=0.9, q_table_in=None, q_table_out=None):
         self.num_states = num_states
         self.num_actions = num_actions
-        self.start_eps = start_epsilon
-        self.end_eps = end_epsilon
-        self.total_timesteps = total_timesteps
-        self.current_eps = start_epsilon
-        self.epsilon_increment = self.get_epsilon_increment()
-        if annealing_function == 'lin':
-            self.anneal_epsilon = self._adjust_epsilon_linear
-        else:
-            raise(ValueError, "Bad annealing function, functions are: "
-                              "\n lin -- linear annealer."
-                              "\n boltz -- boltzman annealer.")
+        self.epsilon = epsilon
         self.learn_rate = learning_rate
         self.discount = discount_factor
         self.table_out = q_table_out
@@ -52,7 +42,7 @@ class QLearner:
         # Assemble valid actions range
         valid_actions = self.num_actions - valid_teammates.count(0)
 
-        explore = True if np.random.random() < self.current_eps else False
+        explore = True if np.random.random() < self.epsilon else False
         if explore:
             random_action = np.random.randint(0, valid_actions)
             if random_action >= 2:
@@ -72,18 +62,6 @@ class QLearner:
 
         return np.argmax(self.q_table[state])
 
-    def get_epsilon_increment(self):
-        return (self.start_eps - self.end_eps) / self.total_timesteps
-
-    def _adjust_epsilon_linear(self, timestep):
-        """
-        Adjust epsilon linearly based on maximum timestep
-
-        :param int timestep: Iteation of training of agent.
-        """
-        epsilon_annealed = timestep * self.epsilon_increment
-        if not self.current_eps <= self.end_eps: # lower limit of epsilon
-            self.current_eps = self.start_eps - epsilon_annealed
 
     def clear(self):
         self.old_state = None

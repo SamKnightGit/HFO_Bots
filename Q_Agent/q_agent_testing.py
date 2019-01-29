@@ -30,12 +30,12 @@ def feature_printer(features, numTeammates, numOpponents):
         print("Teammate {0} Shirt Number: {1:.5f}".format(
             teammate, features[15 + 6 * teammate]))
     for opponent in range(numOpponents):
-        print("Teammate {0} X Position: {1:.5f}".format(
-            teammate, features[10 + 6 * numTeammates + 3 * opponent]))
-        print("Teammate {0} Y Position: {1:.5f}".format(
-            teammate, features[11 + 6 * numTeammates + 3 * opponent]))
-        print("Teammate {0} Shirt Number: {1:.5f}".format(
-            teammate, features[12 + 6 * numTeammates + 3 * opponent]))
+        print("Opponent {0} X Position: {1:.5f}".format(
+            opponent, features[10 + 6 * numTeammates + 3 * opponent]))
+        print("Opponent {0} Y Position: {1:.5f}".format(
+            opponent, features[11 + 6 * numTeammates + 3 * opponent]))
+        print("Opponent {0} Shirt Number: {1:.5f}".format(
+            opponent, features[12 + 6 * numTeammates + 3 * opponent]))
     print("\n\n")
 
 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
 
     q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                         start_epsilon=0.0,
+                         epsilon=0.0,
                          q_table_in=args.qTableDir + str(args.playerIndex) + '.npy',
                          q_table_out=args.qTableDir + str(args.playerIndex) + '.npy')
 

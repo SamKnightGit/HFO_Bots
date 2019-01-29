@@ -83,7 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('--numTeammates', type=int, default=1)
     parser.add_argument('--numOpponents', type=int, default=1)
     parser.add_argument('--numEpisodes', type=int, default=1)
-    parser.add_argument('--epsilon', type=float, default=0.1)
+    parser.add_argument('--epsilon', type=float, default=0.10)
     parser.add_argument('--playerIndex', type=int, default=1)
     parser.add_argument('--inQTableDir', type=str, default=None)
     parser.add_argument('--outQTableDir', type=str, default=Q_TABLE_DIR)
@@ -114,14 +114,12 @@ if __name__ == '__main__':
 
     if args.inQTableDir:
         q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                             total_timesteps=args.numEpisodes,
-                             start_epsilon=args.epsilon,
+                             epsilon=args.epsilon,
                              q_table_in=args.inQTableDir + str(args.playerIndex) + '.npy',
                              q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
     else:
         q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                             total_timesteps=args.numEpisodes,
-                             start_epsilon=args.epsilon,
+                             epsilon=args.epsilon,
                              q_table_in=args.outQTableDir + str(args.playerIndex) + '.npy',
                              q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
 
