@@ -42,15 +42,10 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
               help="Flag to indicate whether only training will occur.")
 def train_2v2(num_iterations, trials_per_iteration, epsilon_start, epsilon_final,
               q_table_directory, output_directory, train_only):
-    if os.path.exists(q_table_directory):
-        sys.exit('Q Table directory already exists, '
-                 'please specify another directory or delete the existing one.')
-    os.makedirs(q_table_directory)
 
-    if os.path.exists(output_directory):
-        sys.exit('Output directory already exists, '
-                 'please specify another directory or delete the existing one.')
-    os.makedirs(output_directory)
+    os.makedirs(q_table_directory, exist_ok=True)
+
+    os.makedirs(output_directory, exist_ok=True)
 
     os.makedirs(logging_dir, exist_ok=True)
 
@@ -130,8 +125,7 @@ def test_2v2(num_iterations, trials_per_iteration, q_table_directory, output_dir
     for iteration in tqdm(range(0, num_iterations)):
         in_q_table_path = q_table_directory + "/iter_" + str(iteration)
 
-        if not os.path.exists(logging_dir):
-            os.mkdir(logging_dir)
+        os.makedirs(logging_dir, exist_ok=True)
 
         logging_file_name_1 = logging_dir + '/test_iter_' + str(iteration) + '_player1.txt'
         logging_file_name_2 = logging_dir + '/test_iter_' + str(iteration) + '_player2.txt'
