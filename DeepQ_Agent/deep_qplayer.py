@@ -1,16 +1,17 @@
 from hfo import *
-from deep_qnetwork import Deep_QNetwork
 
 class Deep_QPlayer:
     """
     Class used to run testing on qnetwork.
     These players do not learn from experience.
     """
-    def __init__(self, qnetwork, port, num_episodes):
+    def __init__(self, qnetwork, port, num_episodes, num_teammates, num_opponents):
         self.qnetwork = qnetwork
         self.hfo_env = None
         self.port = port
         self.num_episodes = num_episodes
+        self.num_teammates = num_teammates
+        self.num_opponents = num_opponents
 
     def get_reward(self, state):
         reward = 0
@@ -40,30 +41,24 @@ class Deep_QPlayer:
 
         for episode in range(0, self.num_episodes):
             status = IN_GAME
-            action = None
-            old_state = None
-            state = None
             timestep = 0
             while status == IN_GAME:
                 timestep += 1
                 state = self.hfo_env.getState()
+                action = self.qnetwork.get_action(state)
 
-                if action is not None:
-                    reward = self.get_reward(state)
-                    if old_state is not None:
-                        self.experience_batches.append((old_state, reward, state, False))
-
-                old_state = state.copy()
-
-            if action is not None and state is not None:
-                reward = self.get_reward(status)
-                self.experience_batches.append((old_state, reward, state, True))
-                self.qnetwork.save()
-                self.update_network()
+                if action == 0:
+                    self.hfo_env.act(DRIBBLE)
+                elif action == 1:
+                    self.hfo_env.act(SHOOT)
+                elif self.num_teammates > 0:
+                    self.hfo_env.act(PASS, state[
+                        57 + (8 * self.num_teammates) + (8 * self.num_opponents)
+                        + (action - 2)
+                        ])
 
             if status == SERVER_DOWN:
                 self.hfo_env.act(QUIT)
-                self.qnetwork.save()
                 break
 
 

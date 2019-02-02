@@ -1,5 +1,4 @@
 import click
-import tqdm
 import subprocess
 from .deep_qnetwork import Deep_QNetwork
 DEEP_QNETWORK_LOAD_PATH = ''
