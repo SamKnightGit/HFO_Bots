@@ -2,7 +2,7 @@ import numpy as np
 
 
 class QLearner:
-    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.1,
+    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.10,
                  discount_factor=0.9, q_table_in=None, q_table_out=None):
         self.num_states = num_states
         self.num_actions = num_actions
@@ -55,9 +55,8 @@ class QLearner:
 
         # If multiple equal q-values, pick randomly
         max_list = np.where(self.q_table[state] == self.q_table[state].max())
-        if len(max_list) > 1:
-            action = np.random.randint(0, len(max_list))
-            print(action)
+        if len(max_list[0]) > 1:
+            action = np.random.randint(0, len(max_list[0]))
             return action
 
         return np.argmax(self.q_table[state])

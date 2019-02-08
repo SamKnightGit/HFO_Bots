@@ -35,15 +35,15 @@ def get_representation(state_arr, num_teammates):
     previous_size += 4
 
     index += in_goal_region * previous_size
-    previous_size += 2
+    previous_size *= 2
 
     if abs(goal_angle) > 0.2:
         index += previous_size
-    previous_size += 2
+    previous_size *= 2
 
     if prox_opponent > 0.7:
         index += previous_size
-    previous_size += 2
+    previous_size *= 2
 
     valid_teammates = [0] * num_teammates
     for teammate in teammates.keys():
@@ -54,16 +54,16 @@ def get_representation(state_arr, num_teammates):
             valid_teammates[teammate] = 1
 
         index += (previous_size * further_than_agent)
-        previous_size += 2
+        previous_size *= 2
 
         index += (previous_size * close_to_opp)
-        previous_size += 3
+        previous_size *= 3
 
         index += (previous_size * pass_angle)
-        previous_size += 3
+        previous_size *= 3
 
         index += (previous_size * goal_angle)
-        previous_size += 3
+        previous_size *= 3
 
     return index, valid_teammates
 
@@ -142,7 +142,6 @@ def get_teammate_metrics(agent_pos, teammate):
         else:
             close_to_opp = 1
 
-    # TODO: Understand what angles make sense
     pass_angle = 2
     p_angle = teammate['pass_angle']
     if p_angle != -2:
