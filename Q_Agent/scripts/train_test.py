@@ -123,7 +123,7 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
             num_agents, num_opponents, num_iterations, num_test_trials,
             num_test_runs, q_table_directory, output_directory
         )
-        plot_data(output_directory, 'test', num_iterations, trials_per_iteration)
+        plot_data(output_directory, vars_string, num_iterations, trials_per_iteration)
 
 
 def test(num_agents, num_opponents, num_iterations, num_test_trials,
