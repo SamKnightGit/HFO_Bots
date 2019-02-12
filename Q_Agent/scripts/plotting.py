@@ -53,15 +53,16 @@ def add_lineplot(file_name, label, axis=None):
     return lineplot
 
 
-def plot_data():
-    save_img_path = os.path.dirname(os.path.abspath(__file__)) + '/../graphs/2v2_20n_50its_eps01_1000test.png'
-    lineplot = add_lineplot('2v2_20n_50its_eps01_1000test', '0.10')
+def plot_data(path_to_output_dir, save_image_name, num_train_iterations,
+              train_trials):
+    save_img_path = os.path.dirname(os.path.abspath(__file__)) + '/../graphs/' + save_image_name + '.png'
+    lineplot = add_lineplot(path_to_output_dir, '0.10')
 
     lineplot.legend(title="Epsilon", loc=4)
     lineplot.minorticks_on()
     lineplot.grid(which='minor', linestyle=':')
-    x_vals = [50 * x for x in range(0, 21)]
-    plt.xlim(0,1000)
+    x_vals = [train_trials * x for x in range(0, num_train_iterations+1)]
+    plt.xlim(0,train_trials*num_train_iterations)
     plt.xticks(x_vals[0::2])
     plt.xlabel("Training Iterations")
     plt.ylabel("Goal Scoring Percentage")
@@ -71,10 +72,10 @@ def plot_data():
 
 
 def get_data_from_files(path_to_output_dir):
-    path_to_output_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)) + '/../output/',
-        path_to_output_dir
-    )
+    # path_to_output_dir = os.path.join(
+    #     os.path.dirname(os.path.abspath(__file__)) + '/../output/',
+    #     path_to_output_dir
+    # )
     # path_to_output_dir = abs_path_test_dir
     test_dirs = []
 
@@ -99,14 +100,13 @@ def get_data_from_files(path_to_output_dir):
         goal_percent_lst.append(goal_percentage)
         frames_lst.append(frames_per_goal)
 
-    
     trials, num_train_runs = get_train_stats(path_to_output_dir)
-    goals_dataframe = pd.DataFrame(columns=[x for x in range(trials, trials*(num_train_runs + 1), trials)])
-    print(goals_dataframe)
-    populate_goals(goals_dataframe, goal_percent_lst)
-    goals_dataframe = goals_dataframe.transpose()
-    goals_dataframe.columns=['test_run_' + str(x) for x in range(0, len(test_files))] 
-    return goals_dataframe
+    goals_df = pd.DataFrame(columns=[x for x in range(trials, trials*(num_train_runs + 1), trials)])
+    print(goals_df)
+    populate_goals(goals_df, goal_percent_lst)
+    goals_df = goals_df.transpose()
+    goals_df.columns=['test_run_' + str(x) for x in range(0, len(test_files))] 
+    return goals_df
 
 
 def goal_data_from_files(test_files):
@@ -158,8 +158,13 @@ def get_train_stats(output_dir):
     return int(get_last_value_float(file_lines[14])), num_train_runs
 
 
-if __name__ == '__main__':
-    plot_data()
+# if __name__ == '__main__':
+#     plot_data(
+#         '/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/Q_Agent/output/2v1_20n_50its_eps01_1000test',
+#         'test',
+#         20,
+#         50
+#     )
 
 
 

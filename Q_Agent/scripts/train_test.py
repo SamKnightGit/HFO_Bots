@@ -7,6 +7,7 @@ import typing
 import time
 from datetime import datetime
 from tqdm import tqdm
+from plotting import plot_data
 
 creation_time = datetime.isoformat(datetime.today())
 
@@ -34,12 +35,14 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
               help="Initial epsilon value.")
 @click.option('--epsilon_final', '-ef', default=0.0,
               help="Final epsilon value.")
-@click.option('--learning_rate', '-lr', default=0.10,
+@click.option('--learning_rate', '-lr', default=0.1,
               help="Learning rate of agents.")
 @click.option('--q_table_directory', '-d', default=qtable_dir,
               help="Path to directory where q tables will be stored.")
 @click.option('--output_directory', '-o', default=output_dir,
               help="Path to directory where output files will be stored.")
+@click.option('--logging_directory', '-o', default=logging_dir,
+              help="Path to directory where training logs will be stored.")
 @click.option('--train_only', '-to', default=0,
               help="Flag to indicate whether only training will occur.")
 @click.option('--num_test_runs', '-tn', default=0,
@@ -50,13 +53,19 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
                    "Defaults to number train iterations when not set.")
 def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
           epsilon_start, epsilon_final, learning_rate, q_table_directory,
-          output_directory, train_only, num_test_runs, num_test_trials):
+          output_directory, logging_directory, train_only, num_test_runs,
+          num_test_trials):
+    vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
+                  "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+"/"
+    q_table_directory += vars_string
+    output_directory += vars_string
+    logging_directory += vars_string
 
     os.makedirs(q_table_directory, exist_ok=True)
 
     os.makedirs(output_directory, exist_ok=True)
 
-    os.makedirs(logging_dir, exist_ok=True)
+    os.makedirs(logging_directory, exist_ok=True)
 
     epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
 
@@ -90,7 +99,7 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
             log_file_names = []
             open_log_files = []
             for agent_index in range(0, num_agents):
-                logging_file = logging_dir + '/train_iter_' + str(iteration) + \
+                logging_file = logging_directory + '/train_iter_' + str(iteration) + \
                                '_player' + str(agent_index + 1) + '.txt'
                 log_file_names.append(logging_file)
                 open_log_files.append(open(logging_file, 'w+'))
@@ -106,14 +115,15 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
             hfo_process.wait()
             close_logs(open_log_files)
 
-        clean_keep_lines(logging_dir, log_file_names, 15)
-        clean_keep_lines(output_dir, [output_file_name], 20)
+        clean_keep_lines(logging_directory, log_file_names, 15)
+        clean_keep_lines(output_directory, [output_file_name], 20)
 
     if not train_only:
         test(
             num_agents, num_opponents, num_iterations, num_test_trials,
             num_test_runs, q_table_directory, output_directory
         )
+        plot_data(output_directory, 'test', num_iterations, trials_per_iteration)
 
 
 def test(num_agents, num_opponents, num_iterations, num_test_trials,
@@ -142,7 +152,7 @@ def test(num_agents, num_opponents, num_iterations, num_test_trials,
 
                 hfo_process.wait()
 
-            clean_keep_lines(output_dir, [output_file_name], 20)
+            clean_keep_lines(output_directory, [output_file_name], 20)
 
 
 def clean_keep_lines(logging_directory, logs, num_lines):
