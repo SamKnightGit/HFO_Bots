@@ -27,7 +27,7 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
 @click.option('--num_agents', '-na', default=2)
 @click.option('--num_opponents', '-no', default=2)
 @click.option('--num_iterations', '-n', default=4,
-              help="The number of training and testing iterations to run the bots on.")
+              help="The number of training iterations to run the bots on.")
 @click.option('--trials_per_iteration', '-t', default=50000,
               help="The number of trials (games) of HFO in each iteration.")
 @click.option('--epsilon_start', '-es', default=0.1,
@@ -40,14 +40,17 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
               help="Path to directory where q tables will be stored.")
 @click.option('--output_directory', '-o', default=output_dir,
               help="Path to directory where output files will be stored.")
-@click.option('--train_only', default=0,
+@click.option('--train_only', '-to', default=0,
               help="Flag to indicate whether only training will occur.")
-@click.option('--num_test_runs', default=0,
+@click.option('--num_test_runs', '-tn', default=0,
               help="Number of test iterations to run for each train iteration."
                    "Automatically sets train_only flag to false when set.")
+@click.option('--num_test_trials', '-tt', default=0,
+              help="Number of test trials to run for each test iteration."
+                   "Defaults to number train iterations when not set.")
 def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
           epsilon_start, epsilon_final, learning_rate, q_table_directory,
-          output_directory, train_only, num_test_runs):
+          output_directory, train_only, num_test_runs, num_test_trials):
 
     os.makedirs(q_table_directory, exist_ok=True)
 
@@ -59,6 +62,9 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
 
     if num_test_runs > 0:
         train_only = False
+
+    if num_test_trials == 0:
+        num_test_trials = trials_per_iteration
 
     for iteration in tqdm(range(0, num_iterations)):
         in_q_table_path = None
@@ -105,12 +111,12 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
 
     if not train_only:
         test(
-            num_agents, num_opponents, num_iterations, trials_per_iteration,
+            num_agents, num_opponents, num_iterations, num_test_trials,
             num_test_runs, q_table_directory, output_directory
         )
 
 
-def test(num_agents, num_opponents, num_iterations, trials_per_iteration,
+def test(num_agents, num_opponents, num_iterations, num_test_trials,
          num_test_runs, q_table_directory, output_directory):
     for iteration in tqdm(range(0, num_iterations)):
         output_iteration_dir = os.path.join(output_directory, 'test_iter_' + str(iteration))
@@ -123,13 +129,13 @@ def test(num_agents, num_opponents, num_iterations, trials_per_iteration,
 
             with open(output_file_name, "w+") as output_file:
                 hfo_process = start_hfo_server(
-                    num_agents, num_opponents, trials_per_iteration, output_file
+                    num_agents, num_opponents, num_test_trials, output_file
                 )
 
                 for agent_index in range(0, num_agents):
                     start_player(
                         num_agents-1, num_opponents, agent_index,
-                        trials_per_iteration, in_q_table_path=in_q_table_path,
+                        num_test_trials, in_q_table_path=in_q_table_path,
                         testing=True
                     )
                     time.sleep(10)
@@ -155,7 +161,7 @@ def start_hfo_server(num_agents, num_opponents, num_trials, output_file: typing.
                                          '--defense-npcs=' + str(num_opponents),
                                          '--offense-on-ball', '1',
                                          '--trials', str(num_trials),
-                                         '--no-sync', '--no-logging'],
+                                         '--headless', '--no-logging'],
                                    stdout=output_file)
     time.sleep(15)
     return hfo_process

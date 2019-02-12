@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     OUT proximity refers to outside of the quartile of the player
     """
-    NUM_STATES = 32 * (36 ** args.numTeammates)
+    NUM_STATES = 32 * (54 ** args.numTeammates)
 
     # Shoot, Pass to one of N teammates or Dribble
     NUM_ACTIONS = 2 + args.numTeammates

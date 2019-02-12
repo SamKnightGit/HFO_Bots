@@ -4,7 +4,7 @@ from pprint import pprint
 import numpy as np
 
 path_to_output = os.path.dirname(os.path.realpath(__file__)) + \
-                 '/../qtables/2019-01-17T00:48:35.871982/'
+                 '/../qtables/2019-02-05T17:52:24.412393/'
 
 for i in range(0,19):
     numpyfile1 = path_to_output + 'iter_' + str(i) + '/q_learner1.npy'

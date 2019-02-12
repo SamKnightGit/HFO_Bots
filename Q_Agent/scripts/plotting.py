@@ -1,7 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-sns.set(style="darkgrid")
+sns.set(style="whitegrid")
+sns.set_context("paper", rc={"xtick.bottom" : True, "ytick.left" : True})
 import numpy as np
 import os
 
@@ -37,18 +38,43 @@ def file_sort(file_name):
     number_file_ext = file_name.split('_')[-1]
     return int(number_file_ext.split('.')[0])
 
-def plot_data():
-    save_img_path = os.path.dirname(os.path.abspath(__file__)) + '/../graphs/2v1_20n_5000t_eps01.png'
-    df = get_data_from_files()
+
+def add_lineplot(file_name, label, axis=None):
+    if axis:
+        df = get_data_from_files(file_name)
+        df = df.reset_index()
+        df = df.melt('index', var_name='cols', value_name='vals')
+        lineplot = sns.lineplot(x='index', y='vals', ci="sd", data=df.reset_index(), ax=axis, label=label)
+        return lineplot
+    df = get_data_from_files(file_name)
     df = df.reset_index()
     df = df.melt('index', var_name='cols', value_name='vals')
-    lineplot = sns.lineplot(x='index', y='vals', markers=True, ci="sd", data=df.reset_index())
+    lineplot = sns.lineplot(x='index', y='vals', ci="sd", data=df.reset_index(), label=label)
+    return lineplot
+
+
+def plot_data():
+    save_img_path = os.path.dirname(os.path.abspath(__file__)) + '/../graphs/2v2_20n_50its_eps01_1000test.png'
+    lineplot = add_lineplot('2v2_20n_50its_eps01_1000test', '0.10')
+
+    lineplot.legend(title="Epsilon", loc=4)
+    lineplot.minorticks_on()
+    lineplot.grid(which='minor', linestyle=':')
+    x_vals = [50 * x for x in range(0, 21)]
+    plt.xlim(0,1000)
+    plt.xticks(x_vals[0::2])
+    plt.xlabel("Training Iterations")
+    plt.ylabel("Goal Scoring Percentage")
+    plt.suptitle("Training Iterations vs. Scoring Percentage \n With varying epsilon values.")
     fig = lineplot.get_figure()
     fig.savefig(save_img_path)
 
 
-def get_data_from_files():
-    path_to_output_dir = os.path.dirname(os.path.abspath(__file__)) + '/../output/2v1_20n_5000its_eps01/'
+def get_data_from_files(path_to_output_dir):
+    path_to_output_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)) + '/../output/',
+        path_to_output_dir
+    )
     # path_to_output_dir = abs_path_test_dir
     test_dirs = []
 
@@ -60,9 +86,10 @@ def get_data_from_files():
     goal_percent_lst = []
     frames_lst = []
 
+
     for dir_index in range(len(test_dirs)):
-        directory = test_dirs[dir_index]
         test_files = []
+        directory = test_dirs[dir_index]
         dir_path = os.path.join(path_to_output_dir, directory)
         for file in os.listdir(dir_path):
             file_path = os.path.join(dir_path, file)
@@ -71,9 +98,11 @@ def get_data_from_files():
         frames_per_goal, goal_percentage = goal_data_from_files(test_files)
         goal_percent_lst.append(goal_percentage)
         frames_lst.append(frames_per_goal)
+
     
-    trials = get_trials(test_files[0])
-    goals_dataframe = pd.DataFrame(columns=[x for x in range(trials, trials*(len(test_files)+1), trials)])
+    trials, num_train_runs = get_train_stats(path_to_output_dir)
+    goals_dataframe = pd.DataFrame(columns=[x for x in range(trials, trials*(num_train_runs + 1), trials)])
+    print(goals_dataframe)
     populate_goals(goals_dataframe, goal_percent_lst)
     goals_dataframe = goals_dataframe.transpose()
     goals_dataframe.columns=['test_run_' + str(x) for x in range(0, len(test_files))] 
@@ -96,6 +125,7 @@ def goal_data_from_files(test_files):
     
 def populate_goals(dataframe, goal_percent_lst):
     for arr_index in range(len(goal_percent_lst)):
+        print(goal_percent_lst[arr_index])
         dataframe[dataframe.columns[arr_index]] = goal_percent_lst[arr_index]
 
 def get_dataframe_columns(num_test_runs):
@@ -113,10 +143,20 @@ def get_goal_percentage(trial_line, goal_line):
     goals = get_last_value_float(goal_line)
     return goals / trials
 
-def get_trials(trial_file):
-    with open(trial_file, 'r') as fp:
+
+def get_train_stats(output_dir):
+    path_to_train_file = None
+    num_train_runs = 0
+    for file in os.listdir(output_dir):
+        if 'train_iter_' in file:
+            num_train_runs += 1
+            if not path_to_train_file:
+                path_to_train_file = os.path.join(output_dir, file)
+    with open(path_to_train_file, 'r') as fp:
         file_lines = fp.readlines()
-    return int(get_last_value_float(file_lines[14]))
+
+    return int(get_last_value_float(file_lines[14])), num_train_runs
+
 
 if __name__ == '__main__':
     plot_data()
