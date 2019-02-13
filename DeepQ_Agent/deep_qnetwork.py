@@ -55,31 +55,25 @@ class Global_QNetwork():
 
 
 class Local_QNetwork():
-    """
-    Intended for use with multiple synchronous learners learning different policies.
-    Based on the asynchronous q-learning algorithm proposed here:
-    https://arxiv.org/abs/1602.01783
-    """
-    def __init__(self, architecture, weights, save_location=None, learning_rate=0.1, discount_factor=0.9,
-                 epsilon=0.10, num_teammates=2, num_opponents=2):
+    def __init__(self, architecture, weights, epsilon=0.0, learning_rate=0.0,
+                 num_teammates=2, load_location=None):
         """
+        QNetwork with no learning of q-values. Used to query actions when testing.
 
         :param state_dims: Dimensionality of state space
         :param load_location: Path where network model is loaded from
         :param save_location: Path where network model shall be saved
         """
+
         self.learning_rate = learning_rate
+        if load_location:
+            self.main_net = load_model(load_location)
+        else:
+            self.main_net = self._create_model(architecture, weights)
 
-        self.main_net = self._create_model(architecture, weights)
-        self.target_net = self.get_main_net_copy()
-
-        self.discount_factor = discount_factor
         self.original_epsilon = epsilon
         self.current_epsilon = epsilon
         self.num_teammates = num_teammates
-        self.num_opponents = num_opponents
-
-        self.save_location = save_location
 
     def _create_model(self, architecture, weights):
         """
@@ -96,29 +90,6 @@ class Local_QNetwork():
         local_network._make_predict_function()
         return local_network
 
-    def update_target_network(self, weights):
-        self.target_net.set_weights(weights)
-
-    def update_main_network(self, weights):
-        self.main_net.set_weights(weights)
-
-    def get_main_net_copy(self):
-        """
-        Returns a copy of the main network, used when updating target network
-
-        :return: keras.Model
-        """
-        architecture = self.main_net.to_json()
-        weights = self.main_net.get_weights()
-        return self._create_model(architecture, weights)
-
-    def get_target(self, experience):
-        old_state, reward, state, terminal_state = experience
-        target = np.array([float(reward)] * (2 + self.num_teammates))
-        if not terminal_state:
-            target += self.discount_factor * self.target_net.predict(state, batch_size=1)[0]
-        return old_state, target.reshape((1,-1))
-
     def get_action(self, state):
         """
         Returns action to be taken by agent
@@ -130,6 +101,49 @@ class Local_QNetwork():
         explore = True if np.random.random() <= self.current_epsilon else False
         if explore:
             return np.random.randint(0, 2 + self.num_teammates)
-
         return np.argmax(self.main_net.predict(state, batch_size=1)[0])
+
+
+class Learning_QNetwork(Local_QNetwork):
+    """
+    Intended for use with multiple synchronous learners learning different policies.
+    Based on the asynchronous q-learning algorithm proposed here:
+    https://arxiv.org/abs/1602.01783
+    """
+    def __init__(self, architecture, weights, save_location=None, learning_rate=0.1,
+                 discount_factor=0.9, epsilon=0.10, num_teammates=2):
+        """
+
+        :param state_dims: Dimensionality of state space
+        :param load_location: Path where network model is loaded from
+        :param save_location: Path where network model shall be saved
+        """
+        super().__init__(architecture, weights, epsilon, learning_rate, num_teammates)
+        self.target_net = self.get_main_net_copy()
+
+        self.discount_factor = discount_factor
+        self.save_location = save_location
+
+    def get_main_net_copy(self):
+        """
+        Returns a copy of the main network, used when updating target network
+
+        :return: keras.Model
+        """
+        architecture = self.main_net.to_json()
+        weights = self.main_net.get_weights()
+        return self._create_model(architecture, weights)
+
+    def update_target_network(self, weights):
+        self.target_net.set_weights(weights)
+
+    def update_main_network(self, weights):
+        self.main_net.set_weights(weights)
+
+    def get_target(self, experience):
+        old_state, reward, state, terminal_state = experience
+        target = np.array([float(reward)] * (2 + self.num_teammates))
+        if not terminal_state:
+            target += self.discount_factor * self.target_net.predict(state, batch_size=1)[0]
+        return old_state, target.reshape((1,-1))
 

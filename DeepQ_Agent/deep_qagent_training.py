@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.5
 
 import subprocess
 import os
@@ -10,9 +10,10 @@ import random
 import time
 from datetime import datetime
 from tqdm import trange
-from deep_qnetwork import Global_QNetwork, Local_QNetwork
-from deep_qlearner import Deep_QLearner
-from agent_thread import Agent_Thread
+from deep_qnetwork import Global_QNetwork
+from deep_qlearner import Deep_QLearner, Discrete_Deep_QLearner
+from agent_thread import Learner_Thread
+from deep_qagent_testing import run_testing
 
 creation_time = datetime.isoformat(datetime.today())
 
@@ -29,26 +30,55 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.command()
 @click.option('--port', '-p', default=6000)
 @click.option('--seed', '-s', default=random.randint(1,5000))
-@click.option('--learning_rate', '-lr', default=0.10)
+@click.option('--discrete', '-d', default=0,
+              help="Flag determining whether discretized state space"
+                   "or continous state space is used.")
+@click.option('--learning_rate', '-lr', default=0.90,
+              help="Learning rate of network.")
+@click.option('--epsilon_start', '-es', default=0.10,
+              help="Initial epsilon value.")
+@click.option('--epsilon_final', '-ef', default=0.0,
+              help="Final epsilon value.")
 @click.option('--num_agents', '-tm', default=2)
 @click.option('--num_opponents', '-op', default=2)
-@click.option('--trials_per_iteration', '-t', default=1)
-@click.option('--num_iterations', '-n', default=0)
-@click.option('--num_parallel_games', '-pg', default=5)
+@click.option('--trials_per_iteration', '-t', default=5)
+@click.option('--num_iterations', '-n', default=1)
+@click.option('--num_parallel_games', '-pg', default=3)
 @click.option('--save_network_dir', '-ns', default=base_network_dir)
 @click.option('--load_network_dir', '-nl', default=base_network_dir)
 @click.option('--logging_dir', '-l', default=base_logging_dir)
 @click.option('--output_dir', '-o', default=base_output_dir)
-def run_training(port, seed, learning_rate, num_agents, num_opponents, trials_per_iteration,
-                 num_iterations, num_parallel_games, save_network_dir, load_network_dir,
-                 logging_dir, output_dir):
+@click.option('--train_only', '-to', default=0,
+              help="Flag to indicate whether only training will occur.")
+@click.option('--num_test_iterations', '-tn', default=0,
+              help="Number of test iterations to run for each train iteration."
+                   "Automatically sets train_only flag to false when set.")
+@click.option('--num_test_trials', '-tt', default=0,
+              help="Number of test trials to run for each test iteration."
+                   "Defaults to number train iterations when not set.")
+def run_training(port, seed, discrete, learning_rate, epsilon_start, epsilon_final, num_agents,
+                 num_opponents, trials_per_iteration, num_iterations, num_parallel_games,
+                 save_network_dir, load_network_dir, logging_dir, output_dir,
+                 train_only, num_test_iterations, num_test_trials):
     experience_queue = queue.Queue()
 
+    epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
+
+    if num_test_iterations > 0:
+        train_only = False
+
+    if num_test_trials == 0:
+        num_test_trials = trials_per_iteration
+
     num_teammates = num_agents - 1
-    state_dimensions = 59 + (9 * num_teammates) + (9 * num_opponents)
+
+    if discrete:
+        state_dimensions = 11 + (6 * num_teammates) + (3 * num_opponents)
+    else:
+        state_dimensions = 59 + (9 * num_teammates) + (9 * num_opponents)
 
     global_network = Global_QNetwork(
-        state_dimensions, 0.1, num_teammates
+        state_dimensions, learning_rate, num_teammates
     )
 
     for iteration in trange(int(num_iterations)):
@@ -63,6 +93,8 @@ def run_training(port, seed, learning_rate, num_agents, num_opponents, trials_pe
 
         out_dir = os.path.join(output_dir, 'iter_' + str(iteration))
         os.makedirs(out_dir, exist_ok=True)
+
+        epsilon_value = epsilon_start - (iteration * epsilon_reduce_value)
 
         hfo_processes = []
         learners = []
@@ -86,11 +118,18 @@ def run_training(port, seed, learning_rate, num_agents, num_opponents, trials_pe
             print("Connecting for game: " + str(game_index))
             unique_port = port + 5 * game_index
 
+
             for agent_index in range(0, int(num_agents)):
-                deep_learner = Deep_QLearner(
-                    global_network, experience_queue, unique_port, learning_rate,
-                    state_dimensions, trials_per_iteration, num_teammates, num_opponents
-                )
+                if discrete:
+                    deep_learner = Discrete_Deep_QLearner(
+                        global_network, experience_queue, unique_port, learning_rate,
+                        epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                    )
+                else:
+                    deep_learner = Deep_QLearner(
+                        global_network, experience_queue, unique_port, learning_rate,
+                        epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                    )
                 print("Agent " + str(agent_index) +
                       " connected for game: " + str(game_index))
                 deep_learners.append(deep_learner)
@@ -99,8 +138,8 @@ def run_training(port, seed, learning_rate, num_agents, num_opponents, trials_pe
         for learner_index in range(0, len(deep_learners)):
             print("Learner " + str(learner_index) + " started.")
             log_file = os.path.join(log_dir, 'learner_' + str(learner_index) + '.txt')
-            learner_thread = Agent_Thread(deep_learners[learner_index], learner_index, finished_list,
-                                          log_file)
+            learner_thread = Learner_Thread(deep_learners[learner_index], learner_index, finished_list,
+                                            log_file)
             learners.append(learner_thread)
             learner_thread.start()
             time.sleep(5)
@@ -121,6 +160,11 @@ def run_training(port, seed, learning_rate, num_agents, num_opponents, trials_pe
 
         global_network.save_network()
 
+    if not train_only:
+        run_testing(
+            load_network_dir, output_dir, 6000, num_agents, num_opponents,
+            num_iterations, num_test_iterations, num_test_trials
+        )
 
 if __name__ == '__main__':
     run_training()
