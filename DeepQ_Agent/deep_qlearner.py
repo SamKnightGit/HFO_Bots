@@ -133,7 +133,7 @@ class Deep_QLearner:
                     break
 
 
-class Discrete_Deep_QLearner(Deep_QLearner):
+class HL_Deep_QLearner(Deep_QLearner):
     def connect(self):
         hfo_env = HFOEnvironment()
         hfo_env.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=self.port)

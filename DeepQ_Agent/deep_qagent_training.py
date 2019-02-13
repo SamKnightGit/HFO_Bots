@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 from tqdm import trange
 from deep_qnetwork import Global_QNetwork
-from deep_qlearner import Deep_QLearner, Discrete_Deep_QLearner
+from deep_qlearner import Deep_QLearner, HL_Deep_QLearner
 from agent_thread import Learner_Thread
 from deep_qagent_testing import run_testing
 
@@ -30,9 +30,9 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.command()
 @click.option('--port', '-p', default=6000)
 @click.option('--seed', '-s', default=random.randint(1,5000))
-@click.option('--discrete', '-d', default=0,
-              help="Flag determining whether discretized state space"
-                   "or continous state space is used.")
+@click.option('--high_level_state_space', '-h', default=0,
+              help="Flag determining whether high level state space"
+                   "is used, instead of low level.")
 @click.option('--learning_rate', '-lr', default=0.90,
               help="Learning rate of network.")
 @click.option('--epsilon_start', '-es', default=0.10,
@@ -56,10 +56,10 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.option('--num_test_trials', '-tt', default=0,
               help="Number of test trials to run for each test iteration."
                    "Defaults to number train iterations when not set.")
-def run_training(port, seed, discrete, learning_rate, epsilon_start, epsilon_final, num_agents,
-                 num_opponents, trials_per_iteration, num_iterations, num_parallel_games,
-                 save_network_dir, load_network_dir, logging_dir, output_dir,
-                 train_only, num_test_iterations, num_test_trials):
+def run_training(port, seed, high_level_state_space, learning_rate, epsilon_start,
+                 epsilon_final, num_agents, num_opponents, trials_per_iteration,
+                 num_iterations, num_parallel_games, save_network_dir, load_network_dir,
+                 logging_dir, output_dir, train_only, num_test_iterations, num_test_trials):
     experience_queue = queue.Queue()
 
     epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
@@ -72,7 +72,7 @@ def run_training(port, seed, discrete, learning_rate, epsilon_start, epsilon_fin
 
     num_teammates = num_agents - 1
 
-    if discrete:
+    if high_level_state_space:
         state_dimensions = 11 + (6 * num_teammates) + (3 * num_opponents)
     else:
         state_dimensions = 59 + (9 * num_teammates) + (9 * num_opponents)
@@ -120,8 +120,8 @@ def run_training(port, seed, discrete, learning_rate, epsilon_start, epsilon_fin
 
 
             for agent_index in range(0, int(num_agents)):
-                if discrete:
-                    deep_learner = Discrete_Deep_QLearner(
+                if high_level_state_space:
+                    deep_learner = HL_Deep_QLearner(
                         global_network, experience_queue, unique_port, learning_rate,
                         epsilon_value, trials_per_iteration, num_teammates, num_opponents
                     )
