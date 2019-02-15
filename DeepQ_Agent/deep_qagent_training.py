@@ -4,7 +4,7 @@ import subprocess
 import os
 import queue
 from typing import List
-
+from threading import Event
 import click
 import random
 import time
@@ -104,9 +104,13 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
 
             output_file = os.path.join(out_dir, 'game_' + str(game_index) + '.txt')
             with open(output_file, 'w+') as outfile:
-                hfo_game = subprocess.Popen(args=['./bin/HFO', '--offense-agents='+str(num_agents), '--defense-npcs=2',
-                                                 '--offense-on-ball', '1', '--trials', str(trials_per_iteration),
-                                                 '--port', str(unique_port), '--seed', str(unique_seed), '--headless'],
+                hfo_game = subprocess.Popen(args=['./bin/HFO',
+                                                  '--offense-agents='+str(num_agents),
+                                                  '--defense-npcs='+str(num_opponents),
+                                                  '--offense-on-ball', '1',
+                                                  '--trials', str(trials_per_iteration),
+                                                  '--port', str(unique_port),
+                                                  '--seed', str(unique_seed), '--headless'],
                                             stdout=outfile,
                                             stderr=outfile)
 
@@ -114,20 +118,20 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
 
         time.sleep(15)
         deep_learners = []
+        update_event = Event()
         for game_index in range(0, num_parallel_games):
             print("Connecting for game: " + str(game_index))
             unique_port = port + 5 * game_index
 
-
             for agent_index in range(0, int(num_agents)):
                 if high_level_state_space:
                     deep_learner = HL_Deep_QLearner(
-                        global_network, experience_queue, unique_port, learning_rate,
+                        global_network, update_event, experience_queue, unique_port, learning_rate,
                         epsilon_value, trials_per_iteration, num_teammates, num_opponents
                     )
                 else:
                     deep_learner = Deep_QLearner(
-                        global_network, experience_queue, unique_port, learning_rate,
+                        global_network, update_event, experience_queue, unique_port, learning_rate,
                         epsilon_value, trials_per_iteration, num_teammates, num_opponents
                     )
                 print("Agent " + str(agent_index) +
@@ -147,7 +151,10 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
         while 0 in finished_list:
             try:
                 state, target = experience_queue.get(timeout=5)
+                update_event.clear()
+                time.sleep(0.01)
                 global_network.net.fit(state, target, batch_size=1, verbose=0)
+                update_event.set()
             except queue.Empty as qe:
                 print("Queue empty, trying again")
 

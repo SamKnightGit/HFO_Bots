@@ -1,11 +1,12 @@
 from hfo import *
+from threading import Event
 from deep_qnetwork import Global_QNetwork, Learning_QNetwork
 import queue
 
 
 class Deep_QLearner:
-    def __init__(self, global_main_network, experience_queue, port, learning_rate,
-                 epsilon, num_episodes, num_teammates, num_opponents):
+    def __init__(self, global_main_network, update_flag, experience_queue, port,
+                 learning_rate, epsilon, num_episodes, num_teammates, num_opponents):
         self.global_main_network = global_main_network  # type: Global_QNetwork
         self.learning_rate = learning_rate
         self.epsilon = epsilon
@@ -15,6 +16,7 @@ class Deep_QLearner:
         self.local_network = None  # type: Learning_QNetwork
         self.initialize_local_network()
 
+        self.shared_update_flag = update_flag  # type: Event
         self.shared_experience_queue = experience_queue  # type: queue.Queue
         self.hfo_env = None
         self.port = port
@@ -23,20 +25,22 @@ class Deep_QLearner:
         self.time_until_main_update = 5
 
     def initialize_local_network(self):
-            main_net_architecture = self.global_main_network.net.to_json()
-            main_net_weights = self.global_main_network.net.get_weights()
-            self.local_network = Learning_QNetwork(
-                main_net_architecture, main_net_weights, learning_rate=self.learning_rate,
-                epsilon=self.epsilon, num_teammates=self.num_teammates
-            )
+        main_net_architecture = self.global_main_network.net.to_json()
+        main_net_weights = self.global_main_network.net.get_weights()
+        self.local_network = Learning_QNetwork(
+            main_net_architecture, main_net_weights, learning_rate=self.learning_rate,
+            epsilon=self.epsilon, num_teammates=self.num_teammates
+        )
 
     def update_local_main_network(self):
-            weights = self.global_main_network.net.get_weights()
-            self.local_network.update_main_network(weights)
+        self.shared_update_flag.wait()
+        weights = self.global_main_network.net.get_weights()
+        self.local_network.update_main_network(weights)
 
     def update_local_target_network(self):
-            weights = self.global_main_network.net.get_weights()
-            self.local_network.update_target_network(weights)
+        self.shared_update_flag.wait()
+        weights = self.global_main_network.net.get_weights()
+        self.local_network.update_target_network(weights)
 
     def get_reward(self, state):
         reward = 0  # type: int
@@ -95,7 +99,6 @@ class Deep_QLearner:
                             input_state, target_val = self.local_network.get_target((old_state, reward, shaped_state, False))
                             self.shared_experience_queue.put((input_state, target_val))
 
-                        self.update_local_main_network()
                         action = self.local_network.get_action(shaped_state)
 
                         if action == 0:
