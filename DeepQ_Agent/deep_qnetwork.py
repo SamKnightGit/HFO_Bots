@@ -2,8 +2,6 @@ from keras.models import Sequential, model_from_json, load_model
 from keras.layers import Dense
 from keras.losses import mean_squared_error
 from keras.optimizers import RMSprop
-from keras.backend import eval
-import tensorflow as tf
 import numpy as np
 import os
 import time
@@ -11,7 +9,7 @@ from typing import List
 
 
 class Global_QNetwork():
-    def __init__(self, state_dims, learning_rate, num_teammates,
+    def __init__(self, state_dims=0, learning_rate=0.0, num_teammates=0,
                  save_location=None, load_location=None):
         if load_location:
             self.net = load_model(load_location)
@@ -23,16 +21,16 @@ class Global_QNetwork():
 
     def create_global_network(self, state_dims, learning_rate, num_teammates):
         model = Sequential()
-        model.add(Dense(1024, input_dim=state_dims, activation='relu',
-                        kernel_initializer='random_uniform',
-                        bias_initializer='zeros'))
-        model.add(Dense(512, activation='relu',
-                        kernel_initializer='random_uniform',
-                        bias_initializer='zeros')),
-        model.add(Dense(256, activation='relu',
-                        kernel_initializer='random_uniform',
-                        bias_initializer='zeros')),
-        model.add(Dense(128, activation='relu',
+        # model.add(Dense(1024, input_dim=state_dims, activation='relu',
+        #                 kernel_initializer='random_uniform',
+        #                 bias_initializer='zeros'))
+        # model.add(Dense(512, activation='relu',
+        #                 kernel_initializer='random_uniform',
+        #                 bias_initializer='zeros')),
+        # model.add(Dense(256, activation='relu',
+        #                 kernel_initializer='random_uniform',
+        #                 bias_initializer='zeros')),
+        model.add(Dense(10, input_dim=state_dims, activation='relu',
                         kernel_initializer='random_uniform',
                         bias_initializer='zeros')),
         model.add(Dense(2 + num_teammates, activation='softmax',
@@ -96,12 +94,13 @@ class Local_QNetwork():
 
         :param np.array state: Current state of the agent
         :return: Action with epsilon greedy policy
-        :rtype: int
+        :rtype: (int, List[int])
         """
         explore = True if np.random.random() <= self.current_epsilon else False
         if explore:
-            return np.random.randint(0, 2 + self.num_teammates)
-        return np.argmax(self.main_net.predict(state, batch_size=1)[0])
+            return np.random.randint(0, 2 + self.num_teammates), []
+        qvalue_array = self.main_net.predict(state, batch_size=1)[0]
+        return np.argmax(qvalue_array), qvalue_array
 
 
 class Learning_QNetwork(Local_QNetwork):
@@ -141,8 +140,9 @@ class Learning_QNetwork(Local_QNetwork):
         self.main_net.set_weights(weights)
 
     def get_target(self, experience):
-        old_state, reward, state, terminal_state = experience
-        target = np.array([float(reward)] * (2 + self.num_teammates))
+        old_state, action, reward, state, terminal_state = experience
+        target = np.array([0.0] * (2 + self.num_teammates))
+        target[action] = reward
         if not terminal_state:
             target += self.discount_factor * self.target_net.predict(state, batch_size=1)[0]
         return old_state, target.reshape((1,-1))

@@ -21,8 +21,8 @@ class Deep_QLearner:
         self.hfo_env = None
         self.port = port
         self.num_episodes = num_episodes
-        self.time_until_target_update = 25
-        self.time_until_main_update = 5
+        self.time_until_target_update = 15
+        self.time_until_main_update = 3
 
     def initialize_local_network(self):
         main_net_architecture = self.global_main_network.net.to_json()
@@ -96,24 +96,25 @@ class Deep_QLearner:
                     else:
                         if action is not None and old_state is not None:
                             reward = self.get_reward(status)
-                            input_state, target_val = self.local_network.get_target((old_state, reward, shaped_state, False))
+                            input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
                             self.shared_experience_queue.put((input_state, target_val))
 
-                        action = self.local_network.get_action(shaped_state)
+                        action, qvalue_arr = self.local_network.get_action(shaped_state)
+                        print("Qval array: " + str(qvalue_arr), flush=True, file=out_file)
 
                         if action == 0:
-                            print("DRIBBLE_CHOSEN", flush=True, file=out_file)
                             self.hfo_env.act(DRIBBLE)
                         elif action == 1:
-                            print("SHOOT_CHOSEN", flush=True, file=out_file)
                             self.hfo_env.act(SHOOT)
                         elif self.num_teammates > 0:
-                            print("PASS CHOSEN", flush=True, file=out_file)
                             teammate_number = round(state[
                                 58 + (8 * self.num_teammates) + (8 * self.num_opponents)
                                 + (action - 2)
                             ] * 100)
-                            self.hfo_env.act(PASS, teammate_number)
+                            if teammate_number == -100: # can't pass to a teammate
+                                self.hfo_env.act(DRIBBLE)
+                            else:
+                                self.hfo_env.act(PASS, teammate_number)
 
                     if (timestep % self.time_until_target_update) == 0:
                         self.update_local_target_network()
@@ -127,9 +128,17 @@ class Deep_QLearner:
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
                     reward = self.get_reward(status)
-                    input_state, target_val = self.local_network.get_target((old_state, reward, shaped_state, True))
-                    self.shared_experience_queue.put((input_state, target_val))
+                    if action == 0:
+                        print("DRIBBLE_CHOSEN with reward " + str(reward), flush=True, file=out_file)
+                    elif action == 1:
+                        print("SHOOT_CHOSEN with reward " + str(reward), flush=True, file=out_file)
+                    else:
+                        print("PASS_CHOSEN with reward " + str(reward), flush=True, file=out_file)
 
+                    input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
+                    self.shared_experience_queue.put((input_state, target_val))
+                    self.update_local_main_network()
+                    self.update_local_target_network()
 
                 if status == SERVER_DOWN:
                     self.hfo_env.act(QUIT)

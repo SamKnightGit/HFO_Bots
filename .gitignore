@@ -1,6 +1,7 @@
 # Project specific stuff
 qtables/
-
+nn_models/
+output/
 
 # Byte compiled / optimized / DLL files
 __pycache__/
