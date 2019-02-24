@@ -51,6 +51,11 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.option('--output_dir', '-o', default=base_output_dir)
 @click.option('--train_only', '-to', default=0,
               help="Flag to indicate whether only training will occur.")
+@click.option('--continue_training', '-ct', default=0,
+              help="Flag to indicate whether training should be continued"
+                   "from a previous point.")
+@click.option('--start_iteration', '-sn', default=0,
+              help="Iteration to start training from if continuing.")
 @click.option('--num_repeated_runs', '-rr', default=1,
               help="Number of complete training runs to execute.")
 @click.option('--num_test_trials', '-tt', default=0,
@@ -59,14 +64,17 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 def run_training(port, seed, high_level_state_space, learning_rate, epsilon_start,
                  epsilon_final, num_agents, num_opponents, trials_per_iteration,
                  num_iterations, num_parallel_games, save_network_dir, load_network_dir,
-                 logging_dir, output_dir, train_only, num_repeated_runs, num_test_trials):
+                 logging_dir, output_dir, train_only, continue_training, start_iteration,
+                 num_repeated_runs, num_test_trials):
     
-    vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
-                  "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+"/"
-    load_network_dir += vars_string
-    save_network_dir += vars_string
-    output_dir += vars_string
-    logging_dir += vars_string
+    if not continue_training:
+        vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
+                    "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+ \
+                    "_pg"+str(num_parallel_games) + "/"
+        load_network_dir += vars_string
+        save_network_dir += vars_string
+        output_dir += vars_string
+        logging_dir += vars_string
     
     for run_index in trange(int(num_repeated_runs)):
         save_net_parent_dir = os.path.join(save_network_dir, 'run_' + str(run_index))
@@ -86,15 +94,20 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
         num_teammates = num_agents - 1
 
         if high_level_state_space:
-            state_dimensions = 11 + (6 * num_teammates) + (3 * num_opponents)
+            state_dimensions = 12 + (6 * num_teammates) + (3 * num_opponents)
         else:
             state_dimensions = 59 + (9 * num_teammates) + (9 * num_opponents)
 
-        global_network = Global_QNetwork(
-            state_dimensions, learning_rate, num_teammates
-        )
+        if continue_training:
+            global_network = Global_QNetwork(
+                load_location=load_network_dir
+            )
+        else:
+            global_network = Global_QNetwork(
+                state_dimensions, learning_rate, num_teammates
+            )
 
-        for iteration in trange(int(num_iterations)):
+        for iteration in trange(int(start_iteration), int(num_iterations)):
 
             save_net_dir = os.path.join(save_net_parent_dir, 'iter_' + str(iteration))
             os.makedirs(save_net_dir, exist_ok=True)
@@ -145,7 +158,8 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
                                                     '--trials', str(trials_per_iteration),
                                                     '--port', str(unique_port),
                                                     '--seed', str(unique_seed),
-                                                    '--headless'],
+                                                    '--headless',
+                                                    '--no-logging'],
                                                 stdout=outfile,
                                                 stderr=outfile)
 
@@ -188,7 +202,7 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
         if not train_only:
             run_testing(
                 load_net_dir, out_parent_dir, port, num_agents, num_opponents,
-                num_iterations, num_test_trials, run_index
+                num_iterations, num_test_trials
             )
 
 

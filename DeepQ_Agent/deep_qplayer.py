@@ -1,4 +1,5 @@
 from hfo import *
+import numpy as np
 from deep_qnetwork import Global_QNetwork, Local_QNetwork
 
 
@@ -91,7 +92,10 @@ class Deep_QPlayer:
                                 58 + (8 * self.num_teammates) + (8 * self.num_opponents)
                                 + (action - 2)
                             ] * 100)
-                            self.hfo_env.act(PASS, teammate_number)
+                            if teammate_number == -100: # can't pass to a teammate
+                                self.hfo_env.act(DRIBBLE)
+                            else:
+                                self.hfo_env.act(PASS, teammate_number)
 
                     status = self.hfo_env.step()
 

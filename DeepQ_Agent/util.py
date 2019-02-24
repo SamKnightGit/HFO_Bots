@@ -6,7 +6,7 @@ def clean_dir_keep_lines(logging_directory, num_lines):
     files_in_dir = []
 
     for file in os.listdir(logging_directory):
-        files_in_dir.append(os.path.abspath(file))
+        files_in_dir.append(os.path.join(logging_directory, file))
 
     clean_keep_lines(logging_directory, files_in_dir, num_lines)
 

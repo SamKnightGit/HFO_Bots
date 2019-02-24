@@ -184,11 +184,11 @@ class HL_Deep_QLearner(Deep_QLearner):
                     else:
                         if action is not None and old_state is not None:
                             reward = self.get_reward(status)
-                            input_state, target_val = self.local_network.get_target((old_state, reward, shaped_state, False))
+                            input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
                             self.shared_experience_queue.put((input_state, target_val))
 
-                        self.update_local_main_network()
-                        action = self.local_network.get_action(shaped_state)
+                        action, qvalue_arr = self.local_network.get_action(shaped_state)
+                        print("Qval array: " + str(qvalue_arr), flush=True, file=out_file)
 
                         if action == 0:
                             print("DRIBBLE_CHOSEN", flush=True, file=out_file)
@@ -212,7 +212,7 @@ class HL_Deep_QLearner(Deep_QLearner):
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
                     reward = self.get_reward(status)
-                    input_state, target_val = self.local_network.get_target((old_state, reward, shaped_state, True))
+                    input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
                     self.shared_experience_queue.put((input_state, target_val))
 
                 if status == SERVER_DOWN:

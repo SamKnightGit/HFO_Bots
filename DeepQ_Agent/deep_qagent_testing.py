@@ -3,13 +3,13 @@ import subprocess
 import os
 import time
 from tqdm import trange
-from util import clean_keep_lines
+from util import clean_keep_lines, clean_dir_keep_lines
 from deep_qnetwork import Global_QNetwork
-from deep_qplayer import Deep_QPlayer
+from deep_qplayer import Deep_QPlayer, HL_Deep_QPlayer
 from agent_thread import Player_Thread
 
 def run_testing(deep_network_path, output_directory, port=6000, num_agents=2,
-                num_opponents=2, num_iterations=0, num_test_trials=0, run_index=0):
+                num_opponents=2, num_iterations=0, num_test_trials=0, high_level=False):
     num_teammates = num_agents - 1
     for iteration in trange(num_iterations):
         network_path = os.path.join(deep_network_path, "iter_" + str(iteration), 'main_net.h5')
@@ -24,17 +24,23 @@ def run_testing(deep_network_path, output_directory, port=6000, num_agents=2,
                                                     '--offense-on-ball', '1',
                                                     '--trials', str(num_test_trials),
                                                     '--port', str(port),
-                                                    '--headless'],
+                                                    '--headless',
+                                                    '--no-logging'],
                                             stdout=outfile)
 
         time.sleep(15)
 
         deep_players = []
         for _ in range(num_agents):
-            deep_learner = Deep_QPlayer(
-                global_network, port, num_test_trials, num_teammates, num_opponents
-            )
-            deep_players.append(deep_learner)
+            if high_level:
+                deep_player = HL_Deep_QPlayer(
+                    global_network, port, num_test_trials, num_teammates, num_opponents
+                )
+            else:
+                deep_player = Deep_QPlayer(
+                    global_network, port, num_test_trials, num_teammates, num_opponents
+                )
+            deep_players.append(deep_player)
             time.sleep(10)
 
         player_threads = []
@@ -49,4 +55,19 @@ def run_testing(deep_network_path, output_directory, port=6000, num_agents=2,
 
         hfo_process.wait()
 
-        clean_keep_lines(output_iteration_dir, [output_file], 20)
+        clean_keep_lines(output_directory, [output_file], 20)
+
+# if __name__ == "__main__":
+#     run_testing('/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/nn_models/2019-02-22T14:36:05.044775_agents2_opponents1_eps0.5_lr0.5/run_0',
+#                 '/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/output/2019-02-22T14:36:05.044775_agents2_opponents1_eps0.5_lr0.5/run_0',
+#                 num_opponents=1, num_iterations=5, num_test_trials=1000, high_level=True)
+    
+    
+#     output_dir = os.path.join(
+#         '/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/output/2019-02-21T19:15:27.171412_agents2_opponents1_eps0.8_lr0.1',
+#         'run_0'
+#     )
+#     for train_dir in os.listdir(output_dir):
+#         train_dir = os.path.join(output_dir, train_dir)
+#         if os.path.isdir(train_dir):
+#             clean_dir_keep_lines(train_dir, 20)
