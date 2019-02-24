@@ -6,7 +6,7 @@ import os
 import typing
 import time
 from datetime import datetime
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from plotting import plot_data
 
 creation_time = datetime.isoformat(datetime.today())
@@ -45,15 +45,14 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
               help="Path to directory where training logs will be stored.")
 @click.option('--train_only', '-to', default=0,
               help="Flag to indicate whether only training will occur.")
-@click.option('--num_test_runs', '-tn', default=0,
-              help="Number of test iterations to run for each train iteration."
-                   "Automatically sets train_only flag to false when set.")
+@click.option('--num_repeated_runs', '-rr', default=0,
+              help="Number of complete training runs to execute.")
 @click.option('--num_test_trials', '-tt', default=0,
-              help="Number of test trials to run for each test iteration."
+              help="Number of test trials to run for each iteration."
                    "Defaults to number train iterations when not set.")
 def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
           epsilon_start, epsilon_final, learning_rate, q_table_directory,
-          output_directory, logging_directory, train_only, num_test_runs,
+          output_directory, logging_directory, train_only, num_repeated_runs,
           num_test_trials):
     vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
                   "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+"/"
@@ -61,98 +60,97 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration,
     output_directory += vars_string
     logging_directory += vars_string
 
-    os.makedirs(q_table_directory, exist_ok=True)
+    for run_index in trange(int(num_repeated_runs)):
+        q_table_dir = os.path.join(q_table_directory, 'run_' + str(run_index))
+        os.makedirs(q_table_dir, exist_ok=True)
 
-    os.makedirs(output_directory, exist_ok=True)
+        output_dir = os.path.join(output_directory, 'run_' + str(run_index))
+        os.makedirs(output_dir, exist_ok=True)
 
-    os.makedirs(logging_directory, exist_ok=True)
+        logging_dir = os.path.join(logging_directory, 'run_' + str(run_index))
+        os.makedirs(logging_dir, exist_ok=True)
 
-    epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
+        epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
 
-    if num_test_runs > 0:
-        train_only = False
+        if num_test_trials == 0:
+            num_test_trials = trials_per_iteration
 
-    if num_test_trials == 0:
-        num_test_trials = trials_per_iteration
+        for iteration in tqdm(range(0, num_iterations)):
+            in_q_table_path = None
+            if iteration != 0:
+                in_q_table_path = os.path.join(q_table_dir, "iter_" + str(iteration-1)) # type: str
+            out_q_table_path = os.path.join(q_table_dir, "iter_" + str(iteration))  # type: str
+            os.mkdir(out_q_table_path)
 
-    for iteration in tqdm(range(0, num_iterations)):
-        in_q_table_path = None
-        if iteration != 0:
-            in_q_table_path = q_table_directory + "/iter_" + str(iteration-1) # type: str
-        out_q_table_path = q_table_directory + "/iter_" + str(iteration)  # type: str
-        os.mkdir(out_q_table_path)
+            # initialize q table files
+            open(os.path.join(out_q_table_path, 'q_learner1.npy'), 'w+').close()
+            open(os.path.join(out_q_table_path, 'q_learner2.npy'), 'w+').close()
 
-        # initialize q table files
-        open(out_q_table_path + '/q_learner1.npy', 'w+').close()
-        open(out_q_table_path + '/q_learner2.npy', 'w+').close()
+            output_file_name = os.path.join(output_dir, 'train_iter_' + str(iteration) + '.txt')
 
-        output_file_name = output_directory + '/train_iter_' + str(iteration) + '.txt'
+            # set epsilon value
+            epsilon_value = epsilon_start - (iteration * epsilon_reduce_value)
 
-        # set epsilon value
-        epsilon_value = epsilon_start - (iteration * epsilon_reduce_value)
-
-        with open(output_file_name, 'w+') as output_file:
-            hfo_process = start_hfo_server(
-                num_agents, num_opponents, trials_per_iteration, output_file
-            )
-
-            log_file_names = []
-            open_log_files = []
-            for agent_index in range(0, num_agents):
-                logging_file = logging_directory + '/train_iter_' + str(iteration) + \
-                               '_player' + str(agent_index + 1) + '.txt'
-                log_file_names.append(logging_file)
-                open_log_files.append(open(logging_file, 'w+'))
-
-            for agent_index in range(0, num_agents):
-                log_file = open_log_files[agent_index]
-                start_player(
-                    num_agents-1, num_opponents, agent_index, trials_per_iteration, log_file,
-                    epsilon_value, learning_rate, in_q_table_path, out_q_table_path
-                )
-                time.sleep(10)
-
-            hfo_process.wait()
-            close_logs(open_log_files)
-
-        clean_keep_lines(logging_directory, log_file_names, 15)
-        clean_keep_lines(output_directory, [output_file_name], 20)
-
-    if not train_only:
-        test(
-            num_agents, num_opponents, num_iterations, num_test_trials,
-            num_test_runs, q_table_directory, output_directory
-        )
-        plot_data(output_directory, vars_string, num_iterations, trials_per_iteration)
-
-
-def test(num_agents, num_opponents, num_iterations, num_test_trials,
-         num_test_runs, q_table_directory, output_directory):
-    for iteration in tqdm(range(0, num_iterations)):
-        output_iteration_dir = os.path.join(output_directory, 'test_iter_' + str(iteration))
-        os.makedirs(output_iteration_dir, exist_ok=True)
-
-        in_q_table_path = q_table_directory + "/iter_" + str(iteration)
-        for test_run in tqdm(range(0, num_test_runs)):
-            output_file_name = os.path.join(output_iteration_dir,
-                                            'test_run_' + str(test_run) + '.txt')
-
-            with open(output_file_name, "w+") as output_file:
+            with open(output_file_name, 'w+') as output_file:
                 hfo_process = start_hfo_server(
-                    num_agents, num_opponents, num_test_trials, output_file
+                    num_agents, num_opponents, trials_per_iteration, output_file
                 )
+
+                log_file_names = []
+                open_log_files = []
+                for agent_index in range(0, num_agents):
+                    logging_file = os.path.join(
+                        logging_dir, 'train_iter_' + str(iteration) + 
+                        '_player' + str(agent_index + 1) + '.txt')
+                    log_file_names.append(logging_file)
+                    open_log_files.append(open(logging_file, 'w+'))
 
                 for agent_index in range(0, num_agents):
+                    log_file = open_log_files[agent_index]
                     start_player(
-                        num_agents-1, num_opponents, agent_index,
-                        num_test_trials, in_q_table_path=in_q_table_path,
-                        testing=True
+                        num_agents-1, num_opponents, agent_index, trials_per_iteration, log_file,
+                        epsilon_value, learning_rate, in_q_table_path, out_q_table_path
                     )
                     time.sleep(10)
 
                 hfo_process.wait()
+                close_logs(open_log_files)
 
-            clean_keep_lines(output_directory, [output_file_name], 20)
+            clean_keep_lines(logging_dir, log_file_names, 15)
+            clean_keep_lines(output_dir, [output_file_name], 20)
+
+        if not train_only:
+            test(
+                num_agents, num_opponents, num_iterations, num_test_trials,
+                q_table_dir, output_dir
+            )
+        #plot_data(output_directory, vars_string, num_iterations, trials_per_iteration)
+
+
+def test(num_agents, num_opponents, num_iterations, num_test_trials,
+         q_table_directory, output_directory):
+    for iteration in tqdm(range(0, num_iterations)):
+        in_q_table_path = q_table_directory + "/iter_" + str(iteration)
+
+        output_file_name = os.path.join(output_directory,
+                                        'test_iter_' + str(iteration) + '.txt')
+
+        with open(output_file_name, "w+") as output_file:
+            hfo_process = start_hfo_server(
+                num_agents, num_opponents, num_test_trials, output_file
+            )
+
+            for agent_index in range(0, num_agents):
+                start_player(
+                    num_agents-1, num_opponents, agent_index,
+                    num_test_trials, in_q_table_path=in_q_table_path,
+                    testing=True
+                )
+                time.sleep(10)
+
+            hfo_process.wait()
+
+        clean_keep_lines(output_directory, [output_file_name], 20)
 
 
 def clean_keep_lines(logging_directory, logs, num_lines):
