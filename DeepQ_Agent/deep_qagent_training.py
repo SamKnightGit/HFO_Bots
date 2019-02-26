@@ -10,9 +10,9 @@ import random
 import time
 from datetime import datetime
 from tqdm import trange
-from util import clean_dir_keep_lines, clean_keep_lines
+from util import clean_dir_keep_lines
 from deep_qnetwork import Global_QNetwork
-from deep_qlearner import Deep_QLearner, HL_Deep_QLearner
+from deep_qlearner import Deep_QLearner, HL_Deep_QLearner, Discrete_Deep_QLearner
 from agent_thread import Learner_Thread
 from deep_qagent_testing import run_testing
 
@@ -31,9 +31,9 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.command()
 @click.option('--port', '-p', default=6000)
 @click.option('--seed', '-s', default=random.randint(1,5000))
-@click.option('--high_level_state_space', '-h', default=0,
-              help="Flag determining whether high level state space"
-                   "is used, instead of low level.")
+@click.option('--state_space', '-ss', default='d',
+              type=click.Choice(['d', 'll', 'hl']),
+              help="State space choice: d -- discrete, ll -- low level, hl -- high level.")
 @click.option('--learning_rate', '-lr', default=0.90,
               help="Learning rate of network.")
 @click.option('--epsilon_start', '-es', default=0.10,
@@ -61,12 +61,12 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.option('--num_test_trials', '-tt', default=0,
               help="Number of test trials to run for each iteration."
                    "Defaults to number train iterations when not set.")
-def run_training(port, seed, high_level_state_space, learning_rate, epsilon_start,
+def run_training(port, seed, state_space, learning_rate, epsilon_start,
                  epsilon_final, num_agents, num_opponents, trials_per_iteration,
                  num_iterations, num_parallel_games, save_network_dir, load_network_dir,
                  logging_dir, output_dir, train_only, continue_training, start_iteration,
                  num_repeated_runs, num_test_trials):
-    
+
     if not continue_training:
         vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
                     "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+ \
@@ -93,10 +93,12 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
 
         num_teammates = num_agents - 1
 
-        if high_level_state_space:
-            state_dimensions = 12 + (6 * num_teammates) + (3 * num_opponents)
-        else:
+        if state_space == 'll':
             state_dimensions = 59 + (9 * num_teammates) + (9 * num_opponents)
+        elif state_space == 'hl':
+            state_dimensions = 12 + (6 * num_teammates) + (3 * num_opponents)
+        else: # discrete state space
+            state_dimensions = 4 + (4 * num_teammates)
 
         if continue_training:
             global_network = Global_QNetwork(
@@ -129,13 +131,18 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
                 unique_port = port + 5 * game_index
 
                 for agent_index in range(0, int(num_agents)):
-                    if high_level_state_space:
+                    if state_space == 'hl':
                         deep_learner = HL_Deep_QLearner(
                             global_network, update_event, experience_queue, unique_port, learning_rate,
                             epsilon_value, trials_per_iteration, num_teammates, num_opponents
                         )
-                    else:
+                    elif state_space == 'll':
                         deep_learner = Deep_QLearner(
+                            global_network, update_event, experience_queue, unique_port, learning_rate,
+                            epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                        )
+                    else:
+                        deep_learner = Discrete_Deep_QLearner(
                             global_network, update_event, experience_queue, unique_port, learning_rate,
                             epsilon_value, trials_per_iteration, num_teammates, num_opponents
                         )
@@ -202,7 +209,7 @@ def run_training(port, seed, high_level_state_space, learning_rate, epsilon_star
         if not train_only:
             run_testing(
                 load_net_dir, out_parent_dir, port, num_agents, num_opponents,
-                num_iterations, num_test_trials
+                num_iterations, num_test_trials, state_space
             )
 
 

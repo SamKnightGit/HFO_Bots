@@ -2,6 +2,8 @@ from hfo import *
 from threading import Event
 from deep_qnetwork import Global_QNetwork, Learning_QNetwork
 import queue
+import state_representer
+
 
 
 class Deep_QLearner:
@@ -22,7 +24,7 @@ class Deep_QLearner:
         self.port = port
         self.num_episodes = num_episodes
         self.time_until_target_update = 15
-        self.time_until_main_update = 3
+        self.time_until_main_update = 10
 
     def initialize_local_network(self):
         main_net_architecture = self.global_main_network.net.to_json()
@@ -219,3 +221,80 @@ class HL_Deep_QLearner(Deep_QLearner):
                     self.hfo_env.act(QUIT)
                     break
 
+
+class Discrete_Deep_QLearner(Deep_QLearner):
+    def connect(self):
+        hfo_env = HFOEnvironment()
+        hfo_env.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=self.port)
+        self.hfo_env = hfo_env
+
+    def run_episodes(self, output_file):
+        if not self.hfo_env:
+            raise(ValueError, "HFO Environment not detected, must run connect before run_episodes.")
+
+        with open(output_file, 'w+') as out_file:
+            for episode in range(0, self.num_episodes):
+                status = IN_GAME
+                action = None
+                old_state = None
+                state = None
+                history = []
+                timestep = 0
+                while status == IN_GAME:
+                    timestep += 1
+                    features = np.array(self.hfo_env.getState())
+                    state = np.array(
+                        state_representer.get_representation(features, self.num_teammates)
+                    )
+                    shaped_state = state.reshape((1, -1))
+
+                    if int(features[5]) != 1:
+                        history.append((features[0], features[1]))
+                        if len(history) > 5:
+                            history.pop(0)
+
+                        if len(history) == 5:
+                            if history[0][0] == history[4][0] and history[0][1] == history[4][1]:
+                                self.hfo_env.act(REORIENT)
+                                history = []
+                                continue
+
+                        self.hfo_env.act(MOVE)
+
+                    else:
+                        if action is not None and old_state is not None:
+                            reward = self.get_reward(status)
+                            input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
+                            self.shared_experience_queue.put((input_state, target_val))
+
+                        action, qvalue_arr = self.local_network.get_action(shaped_state)
+                        print("Qval array: " + str(qvalue_arr), flush=True, file=out_file)
+
+                        if action == 0:
+                            print("DRIBBLE_CHOSEN", flush=True, file=out_file)
+                            self.hfo_env.act(DRIBBLE)
+                        elif action == 1:
+                            print("SHOOT_CHOSEN", flush=True, file=out_file)
+                            self.hfo_env.act(SHOOT)
+                        elif self.num_teammates > 0:
+                            print("PASS CHOSEN", flush=True, file=out_file)
+                            self.hfo_env.act(PASS, features[15 + 6 * (action-2)])
+
+                    if (timestep % self.time_until_target_update) == 0:
+                        self.update_local_target_network()
+
+                    if (timestep % self.time_until_main_update) == 0:
+                        self.update_local_main_network()
+
+                    old_state = np.copy(shaped_state)
+                    status = self.hfo_env.step()
+
+                if action is not None and state is not None:
+                    shaped_state = state.reshape((1, -1))
+                    reward = self.get_reward(status)
+                    input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
+                    self.shared_experience_queue.put((input_state, target_val))
+
+                if status == SERVER_DOWN:
+                    self.hfo_env.act(QUIT)
+                    break
