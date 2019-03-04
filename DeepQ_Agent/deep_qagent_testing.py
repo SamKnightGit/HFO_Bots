@@ -62,9 +62,9 @@ def run_testing(deep_network_path, output_directory, port=6000, num_agents=2,
         clean_keep_lines(output_directory, [output_file], 20)
 
 # if __name__ == "__main__":
-#     run_testing('/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/nn_models/2019-02-26T01:22:50.743288_agents2_opponents1_eps1.0_lr0.9_pg5/run_0',
-#                 '/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/output/2019-02-26T01:22:50.743288_agents2_opponents1_eps1.0_lr0.9_pg5/run_0',
-#                 port=7500, num_opponents=1, num_iterations=10, num_test_trials=1000, high_level=True)
+#     run_testing('/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/nn_models/2019-02-27T00:00:10.966348_agents2_opponents1_eps1.0_lr0.99_pg5_d/run_0',
+#                 '/home/samdknight/Documents/Edinburgh/4th/Dissertation/HFO/example/custom_agents/HFO_Bots/DeepQ_Agent/output/2019-02-27T00:00:10.966348_agents2_opponents1_eps1.0_lr0.99_pg5_d/run_0',
+#                 port=7500, num_opponents=1, num_iterations=10, num_test_trials=1000)
 #
 #
 #     output_dir = os.path.join(

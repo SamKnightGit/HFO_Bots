@@ -31,12 +31,14 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.command()
 @click.option('--port', '-p', default=6000)
 @click.option('--seed', '-s', default=random.randint(1,5000))
+@click.option('--vary_seed', '-vs', default=False,
+              help="Ensure seed changes across parallel games.")
 @click.option('--state_space', '-ss', default='d',
               type=click.Choice(['d', 'll', 'hl']),
               help="State space choice: d -- discrete, ll -- low level, hl -- high level.")
-@click.option('--learning_rate', '-lr', default=0.90,
+@click.option('--learning_rate', '-lr', default=0.00001,
               help="Learning rate of network.")
-@click.option('--epsilon_start', '-es', default=0.10,
+@click.option('--epsilon_start', '-es', default=0.80,
               help="Initial epsilon value.")
 @click.option('--epsilon_final', '-ef', default=0.0,
               help="Final epsilon value.")
@@ -61,7 +63,7 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.option('--num_test_trials', '-tt', default=0,
               help="Number of test trials to run for each iteration."
                    "Defaults to number train iterations when not set.")
-def run_training(port, seed, state_space, learning_rate, epsilon_start,
+def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_start,
                  epsilon_final, num_agents, num_opponents, trials_per_iteration,
                  num_iterations, num_parallel_games, save_network_dir, load_network_dir,
                  logging_dir, output_dir, train_only, continue_training, start_iteration,
@@ -70,7 +72,7 @@ def run_training(port, seed, state_space, learning_rate, epsilon_start,
     if not continue_training:
         vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
                     "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+ \
-                    "_pg"+str(num_parallel_games) + "/"
+                    "_pg"+str(num_parallel_games)+"_"+str(state_space)+"/"
         load_network_dir += vars_string
         save_network_dir += vars_string
         output_dir += vars_string
@@ -154,7 +156,9 @@ def run_training(port, seed, state_space, learning_rate, epsilon_start,
             
             for game_index in range(0, num_parallel_games):
                 unique_port = port + 5 * game_index # consecutive ports does not work well
-                unique_seed = seed + game_index
+                unique_seed = seed
+                if vary_seed:
+                    unique_seed += game_index
 
                 output_file = os.path.join(out_dir, 'game_' + str(game_index) + '.txt')
                 with open(output_file, 'w+') as outfile:

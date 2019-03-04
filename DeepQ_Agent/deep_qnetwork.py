@@ -150,6 +150,16 @@ class Learning_QNetwork(Local_QNetwork):
         target = np.array([0.0] * (2 + self.num_teammates))
         target[action] = reward
         if not terminal_state:
-            target += self.discount_factor * self.target_net.predict(state, batch_size=1)[0]
+            target[action] += self.discount_factor * np.max(self.target_net.predict(state, batch_size=1)[0])
         return old_state, target.reshape((1,-1))
 
+
+class Learning_DoubleQNetwork(Learning_QNetwork):
+
+    def get_target(self, experience):
+        old_state, action, reward, state, terminal_state = experience
+        target = np.array([0.0] * (2 + self.num_teammates))
+        target[action] = reward
+        if not terminal_state:
+            target[action] += self.discount_factor * self.target_net.predict(state, batch_size=1)[0][action]
+        return old_state, target.reshape((1,-1))
