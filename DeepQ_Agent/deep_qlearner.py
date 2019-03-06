@@ -72,6 +72,8 @@ class Deep_QLearner:
 
         with open(output_file, 'w+') as out_file:
             for episode in range(0, self.num_episodes):
+                if episode % self.time_until_target_update == 0:
+                    self.update_local_target_network()
                 status = IN_GAME
                 action = None
                 old_state = None
@@ -118,11 +120,11 @@ class Deep_QLearner:
                             else:
                                 self.hfo_env.act(PASS, teammate_number)
 
-                    if (timestep % self.time_until_target_update) == 0:
-                        self.update_local_target_network()
-
-                    if (timestep % self.time_until_main_update) == 0:
-                        self.update_local_main_network()
+                    # if (timestep % self.time_until_target_update) == 0:
+                    #     self.update_local_target_network()
+                    #
+                    # if (timestep % self.time_until_main_update) == 0:
+                    #     self.update_local_main_network()
 
                     old_state = np.copy(shaped_state)
                     status = self.hfo_env.step()
@@ -140,7 +142,7 @@ class Deep_QLearner:
                     input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
                     self.shared_experience_queue.put((input_state, target_val))
                     self.update_local_main_network()
-                    self.update_local_target_network()
+                    # self.update_local_target_network()
 
                 if status == SERVER_DOWN:
                     self.hfo_env.act(QUIT)
