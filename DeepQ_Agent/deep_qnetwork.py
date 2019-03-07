@@ -161,8 +161,9 @@ class Learning_DoubleQNetwork(Learning_QNetwork):
 
     def get_target(self, experience):
         old_state, action, reward, state, terminal_state = experience
+        greedy_policy_action = self.get_action(state)
         target = np.array([0.0] * (2 + self.num_teammates))
         target[action] = reward
         if not terminal_state:
-            target[action] += self.discount_factor * self.target_net.predict(state, batch_size=1)[0][action]
+            target[action] += self.discount_factor * self.target_net.predict(state, batch_size=1)[0][greedy_policy_action]
         return old_state, target.reshape((1,-1))
