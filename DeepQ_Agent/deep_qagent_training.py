@@ -103,8 +103,10 @@ def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_star
             state_dimensions = 4 + (4 * num_teammates)
 
         if continue_training:
+            network_path = os.path.join(
+                load_net_dir, 'iter_' + str(start_iteration-1), 'main_net.h5')
             global_network = Global_QNetwork(
-                load_location=load_network_dir
+                load_location=network_path
             )
         else:
             global_network = Global_QNetwork(
