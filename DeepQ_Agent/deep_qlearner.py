@@ -1,65 +1,64 @@
 from hfo import *
 from threading import Event
-from deep_qnetwork import Global_QNetwork, Learning_QNetwork
-import queue
+from deep_qnetwork import Global_QNetwork, Learning_QNetwork, Learning_DoubleQNetwork
+from typing import List
 import state_representer
+import reward_functions
 
 
 
 class Deep_QLearner:
-    def __init__(self, global_main_network, update_flag, experience_queue, port,
+    def __init__(self, global_main_network, reward_function_name, experience_list, port, double_q,
                  learning_rate, epsilon, num_episodes, num_teammates, num_opponents):
         self.global_main_network = global_main_network  # type: Global_QNetwork
+        self.reward_function_name = reward_function_name
+        self.reward_function = self.get_reward_function(reward_function_name)
         self.learning_rate = learning_rate
         self.epsilon = epsilon
         self.num_teammates = num_teammates
         self.num_opponents = num_opponents
-
+        self.double_q = double_q
         self.local_network = None  # type: Learning_QNetwork
         self.initialize_local_network()
 
-        self.shared_update_flag = update_flag  # type: Event
-        self.shared_experience_queue = experience_queue  # type: queue.Queue
+        self.shared_experience_list = experience_list  # type: List
         self.hfo_env = None
         self.port = port
         self.num_episodes = num_episodes
         self.time_until_target_update = 15
-        self.time_until_main_update = 10
+        # currently unused -- updated after every episode
+        # self.time_until_main_update = 10
 
     def initialize_local_network(self):
         main_net_architecture = self.global_main_network.net.to_json()
         main_net_weights = self.global_main_network.net.get_weights()
-        self.local_network = Learning_QNetwork(
-            main_net_architecture, main_net_weights, learning_rate=self.learning_rate,
-            epsilon=self.epsilon, num_teammates=self.num_teammates
-        )
+        if self.double_q:
+            self.local_network = Learning_DoubleQNetwork(
+                main_net_architecture, main_net_weights, learning_rate=self.learning_rate,
+                epsilon=self.epsilon, num_teammates=self.num_teammates
+            )
+        else:
+            self.local_network = Learning_QNetwork(
+                main_net_architecture, main_net_weights, learning_rate=self.learning_rate,
+                epsilon=self.epsilon, num_teammates=self.num_teammates
+            )
 
     def update_local_main_network(self):
-        self.shared_update_flag.wait()
         weights = self.global_main_network.net.get_weights()
         self.local_network.update_main_network(weights)
 
     def update_local_target_network(self):
-        self.shared_update_flag.wait()
         weights = self.global_main_network.net.get_weights()
         self.local_network.update_target_network(weights)
 
-    def get_reward(self, state):
-        reward = 0  # type: int
+    def get_reward_function(self, reward_function_name):
+        if reward_function_name == 'sparse':
+            return reward_functions.get_sparse_reward
+        elif reward_function_name == 'simple':
+            return reward_functions.ll_simple_reward
+        else: #advanced
+            return reward_functions.ll_advanced_reward
 
-        if state == GOAL:
-            reward = 1
-
-        elif state == CAPTURED_BY_DEFENSE:
-            reward = -1
-
-        elif state == OUT_OF_BOUNDS:
-            reward = -1
-
-        elif state == OUT_OF_TIME:
-            reward = -1
-
-        return reward
 
     def connect(self):
         hfo_env = HFOEnvironment()
@@ -99,9 +98,12 @@ class Deep_QLearner:
 
                     else:
                         if action is not None and old_state is not None:
-                            reward = self.get_reward(status)
-                            input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
-                            self.shared_experience_queue.put((input_state, target_val))
+                            if self.reward_function_name == 'sparse':
+                                reward = self.reward_function(status)
+                            else:
+                                reward = self.reward_function(old_state, action, state)
+                            target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
+                            self.shared_experience_list.append((old_state, target_val))
 
                         action, qvalue_arr = self.local_network.get_action(shaped_state)
                         print("Qval array: " + str(qvalue_arr), flush=True, file=out_file)
@@ -120,18 +122,15 @@ class Deep_QLearner:
                             else:
                                 self.hfo_env.act(PASS, teammate_number)
 
-                    # if (timestep % self.time_until_target_update) == 0:
-                    #     self.update_local_target_network()
-                    #
-                    # if (timestep % self.time_until_main_update) == 0:
-                    #     self.update_local_main_network()
-
                     old_state = np.copy(shaped_state)
                     status = self.hfo_env.step()
 
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
-                    reward = self.get_reward(status)
+                    if self.reward_function_name == 'sparse':
+                        reward = self.reward_function(status)
+                    else:
+                        reward = self.reward_function(old_state, action, state)
                     if action == 0:
                         print("DRIBBLE_CHOSEN with reward " + str(reward), flush=True, file=out_file)
                     elif action == 1:
@@ -139,10 +138,9 @@ class Deep_QLearner:
                     else:
                         print("PASS_CHOSEN with reward " + str(reward), flush=True, file=out_file)
 
-                    input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
-                    self.shared_experience_queue.put((input_state, target_val))
+                    target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
+                    self.shared_experience_list.append((old_state, target_val))
                     self.update_local_main_network()
-                    # self.update_local_target_network()
 
                 if status == SERVER_DOWN:
                     self.hfo_env.act(QUIT)
@@ -150,6 +148,14 @@ class Deep_QLearner:
 
 
 class HL_Deep_QLearner(Deep_QLearner):
+    def get_reward_function(self, reward_function_name):
+        if reward_function_name == 'sparse':
+            return reward_functions.get_sparse_reward
+        elif reward_function_name == 'simple':
+            return reward_functions.hl_simple_reward
+        else: #advanced
+            return reward_functions.hl_advanced_reward
+
     def connect(self):
         hfo_env = HFOEnvironment()
         hfo_env.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=self.port)
@@ -161,6 +167,8 @@ class HL_Deep_QLearner(Deep_QLearner):
 
         with open(output_file, 'w+') as out_file:
             for episode in range(0, self.num_episodes):
+                if episode % self.time_until_target_update == 0:
+                    self.update_local_target_network()
                 status = IN_GAME
                 action = None
                 old_state = None
@@ -187,9 +195,12 @@ class HL_Deep_QLearner(Deep_QLearner):
 
                     else:
                         if action is not None and old_state is not None:
-                            reward = self.get_reward(status)
-                            input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
-                            self.shared_experience_queue.put((input_state, target_val))
+                            if self.reward_function_name == 'sparse':
+                                reward = self.reward_function(status)
+                            else:
+                                reward = self.reward_function(old_state, action, shaped_state)
+                            target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
+                            self.shared_experience_list.append((old_state, target_val))
 
                         action, qvalue_arr = self.local_network.get_action(shaped_state)
                         print("Qval array: " + str(qvalue_arr), flush=True, file=out_file)
@@ -204,20 +215,18 @@ class HL_Deep_QLearner(Deep_QLearner):
                             print("PASS CHOSEN", flush=True, file=out_file)
                             self.hfo_env.act(PASS, state[15 + 6 * (action-2)])
 
-                    if (timestep % self.time_until_target_update) == 0:
-                        self.update_local_target_network()
-
-                    if (timestep % self.time_until_main_update) == 0:
-                        self.update_local_main_network()
-
                     old_state = np.copy(shaped_state)
                     status = self.hfo_env.step()
 
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
-                    reward = self.get_reward(status)
-                    input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
-                    self.shared_experience_queue.put((input_state, target_val))
+                    if self.reward_function_name == 'sparse':
+                        reward = self.reward_function(status)
+                    else:
+                        reward = self.reward_function(old_state, action, shaped_state)
+                    target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
+                    self.shared_experience_list.append((old_state, target_val))
+                    self.update_local_main_network()
 
                 if status == SERVER_DOWN:
                     self.hfo_env.act(QUIT)
@@ -225,6 +234,14 @@ class HL_Deep_QLearner(Deep_QLearner):
 
 
 class Discrete_Deep_QLearner(Deep_QLearner):
+    def get_reward_function(self, reward_function_name):
+        if reward_function_name == 'sparse':
+            return reward_functions.get_sparse_reward
+        elif reward_function_name == 'simple':
+            return reward_functions.discrete_simple_reward
+        else: #advanced
+            return reward_functions.discrete_advanced_reward
+
     def connect(self):
         hfo_env = HFOEnvironment()
         hfo_env.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=self.port)
@@ -265,9 +282,13 @@ class Discrete_Deep_QLearner(Deep_QLearner):
 
                     else:
                         if action is not None and old_state is not None:
-                            reward = self.get_reward(status)
-                            input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
-                            self.shared_experience_queue.put((input_state, target_val))
+                            if self.reward_function_name == 'sparse':
+                                reward = self.reward_function(status)
+                            else:
+                                reward = self.reward_function(old_state, action, shaped_state)
+                                print(reward)
+                            target_val = self.local_network.get_target((old_state, action, reward, shaped_state, False))
+                            self.shared_experience_list.append((old_state, target_val))
 
                         action, qvalue_arr = self.local_network.get_action(shaped_state)
                         print("Qval array: " + str(qvalue_arr), flush=True, file=out_file)
@@ -282,20 +303,18 @@ class Discrete_Deep_QLearner(Deep_QLearner):
                             print("PASS CHOSEN", flush=True, file=out_file)
                             self.hfo_env.act(PASS, features[15 + 6 * (action-2)])
 
-                    if (timestep % self.time_until_target_update) == 0:
-                        self.update_local_target_network()
-
-                    if (timestep % self.time_until_main_update) == 0:
-                        self.update_local_main_network()
-
                     old_state = np.copy(shaped_state)
                     status = self.hfo_env.step()
 
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
-                    reward = self.get_reward(status)
-                    input_state, target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
-                    self.shared_experience_queue.put((input_state, target_val))
+                    if self.reward_function_name == 'sparse':
+                        reward = self.reward_function(status)
+                    else:
+                        reward = self.reward_function(old_state, action, shaped_state)
+                    target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
+                    self.shared_experience_list.append((old_state, target_val))
+                    self.update_local_main_network()
 
                 if status == SERVER_DOWN:
                     self.hfo_env.act(QUIT)

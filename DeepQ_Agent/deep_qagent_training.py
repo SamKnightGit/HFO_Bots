@@ -8,6 +8,7 @@ from threading import Event
 import click
 import random
 import time
+import numpy as np
 from datetime import datetime
 from tqdm import trange
 from util import clean_dir_keep_lines
@@ -33,10 +34,15 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.option('--seed', '-s', default=random.randint(1,5000))
 @click.option('--vary_seed', '-vs', default=False,
               help="Ensure seed changes across parallel games.")
+@click.option('--double_q', '-dq', default=False,
+              help="Flag indicating whether double q learning should be used")
+@click.option('--reward_function', '-rf', default='sparse',
+              type=click.Choice(['sparse', 'simple', 'advanced']),
+              help="Reward function to be used: sparse, simple or advanced")
 @click.option('--state_space', '-ss', default='d',
               type=click.Choice(['d', 'll', 'hl']),
               help="State space choice: d -- discrete, ll -- low level, hl -- high level.")
-@click.option('--learning_rate', '-lr', default=0.00001,
+@click.option('--learning_rate', '-lr', default=0.0001,
               help="Learning rate of network.")
 @click.option('--epsilon_start', '-es', default=0.80,
               help="Initial epsilon value.")
@@ -63,16 +69,17 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
 @click.option('--num_test_trials', '-tt', default=0,
               help="Number of test trials to run for each iteration."
                    "Defaults to number train iterations when not set.")
-def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_start,
-                 epsilon_final, num_agents, num_opponents, trials_per_iteration,
+def run_training(port, seed, vary_seed, double_q, reward_function, state_space, learning_rate,
+                 epsilon_start, epsilon_final, num_agents, num_opponents, trials_per_iteration,
                  num_iterations, num_parallel_games, save_network_dir, load_network_dir,
                  logging_dir, output_dir, train_only, continue_training, start_iteration,
                  num_repeated_runs, num_test_trials):
 
     if not continue_training:
         vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
-                    "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+ \
-                    "_pg"+str(num_parallel_games)+"_"+str(state_space)+"/"
+                      "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+ \
+                      "_pg"+str(num_parallel_games)+"_doubleq" + str(double_q) + \
+                      "_"+str(state_space)+"/"
         load_network_dir += vars_string
         save_network_dir += vars_string
         output_dir += vars_string
@@ -84,7 +91,7 @@ def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_star
         log_parent_dir = os.path.join(logging_dir, 'run_' + str(run_index))
         out_parent_dir = os.path.join(output_dir, 'run_' + str(run_index))
 
-        experience_queue = queue.Queue()
+        experience_list = []
 
         epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
 
@@ -129,7 +136,6 @@ def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_star
             epsilon_value = epsilon_start - (iteration * epsilon_reduce_value)
 
             deep_learners = []
-            update_event = Event()
             for game_index in range(0, num_parallel_games):
                 print("Connecting for game: " + str(game_index))
                 unique_port = port + 5 * game_index
@@ -137,18 +143,18 @@ def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_star
                 for agent_index in range(0, int(num_agents)):
                     if state_space == 'hl':
                         deep_learner = HL_Deep_QLearner(
-                            global_network, update_event, experience_queue, unique_port, learning_rate,
-                            epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                            global_network, reward_function, experience_list, unique_port, double_q,
+                            learning_rate, epsilon_value, trials_per_iteration, num_teammates, num_opponents
                         )
                     elif state_space == 'll':
                         deep_learner = Deep_QLearner(
-                            global_network, update_event, experience_queue, unique_port, learning_rate,
-                            epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                            global_network, reward_function, experience_list, unique_port, double_q,
+                            learning_rate, epsilon_value, trials_per_iteration, num_teammates, num_opponents
                         )
                     else:
                         deep_learner = Discrete_Deep_QLearner(
-                            global_network, update_event, experience_queue, unique_port, learning_rate,
-                            epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                            global_network, reward_function, experience_list, unique_port, double_q,
+                            learning_rate, epsilon_value, trials_per_iteration, num_teammates, num_opponents
                         )
                     print("Agent " + str(agent_index) +
                         " connected for game: " + str(game_index))
@@ -193,14 +199,18 @@ def run_training(port, seed, vary_seed, state_space, learning_rate, epsilon_star
                 time.sleep(5)
 
             while 0 in finished_list:
-                try:
-                    state, target = experience_queue.get(timeout=5)
-                    update_event.clear()
-                    time.sleep(0.05)
-                    global_network.net.fit(state, target, batch_size=1, verbose=0)
-                    update_event.set()
-                except queue.Empty:
-                    print("Queue empty, trying again")
+                experience_list_copy = experience_list.copy()
+                states = np.array([x[0][0] for x in experience_list_copy])
+                targets = np.array([x[1][0] for x in experience_list_copy])
+                print("\n***********************\n")
+                print(targets)
+                print("Length of arrays {0}".format(len(states)))
+                print("\n***********************\n")
+                if states.any():
+                    global_network.net.fit(states, targets, batch_size=len(states), verbose=0)
+                experience_list.clear()
+                # accumulate experiences for one second
+                time.sleep(1)
 
             for learner in learners:
                 learner.join()

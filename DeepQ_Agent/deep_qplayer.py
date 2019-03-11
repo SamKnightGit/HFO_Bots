@@ -29,22 +29,6 @@ class Deep_QPlayer:
                 num_teammates=self.num_teammates
             )
 
-    def get_reward(self, state):
-        reward = 0
-
-        if state == GOAL:
-            reward = 1
-
-        elif state == CAPTURED_BY_DEFENSE:
-            reward = -1
-
-        elif state == OUT_OF_BOUNDS:
-            reward = -1
-
-        elif state == OUT_OF_TIME:
-            reward = -1
-
-        return reward
 
     def connect(self):
         hfo_env = HFOEnvironment()

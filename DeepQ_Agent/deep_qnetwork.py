@@ -42,7 +42,7 @@ class Global_QNetwork():
         # model.add(Dense(25, activation='relu',
         #                 kernel_initializer='random_uniform',
         #                 bias_initializer='zeros')),
-        model.add(Dense(2 + num_teammates, activation='softmax',
+        model.add(Dense(2 + num_teammates, activation='linear',
                         kernel_initializer='random_uniform',
                         bias_initializer='zeros'))
         model.compile(loss=mean_squared_error,
@@ -119,7 +119,7 @@ class Learning_QNetwork(Local_QNetwork):
     https://arxiv.org/abs/1602.01783
     """
     def __init__(self, architecture, weights, save_location=None, learning_rate=0.1,
-                 discount_factor=0.9, epsilon=0.10, num_teammates=2):
+                 discount_factor=0.95, epsilon=0.10, num_teammates=2):
         """
 
         :param state_dims: Dimensionality of state space
@@ -154,16 +154,16 @@ class Learning_QNetwork(Local_QNetwork):
         target[action] = reward
         if not terminal_state:
             target[action] += self.discount_factor * np.max(self.target_net.predict(state, batch_size=1)[0])
-        return old_state, target.reshape((1,-1))
+        return target.reshape((1,-1))
 
 
 class Learning_DoubleQNetwork(Learning_QNetwork):
 
     def get_target(self, experience):
         old_state, action, reward, state, terminal_state = experience
-        greedy_policy_action = self.get_action(state)
+        greedy_policy_action, _ = self.get_action(state)
         target = np.array([0.0] * (2 + self.num_teammates))
         target[action] = reward
         if not terminal_state:
             target[action] += self.discount_factor * self.target_net.predict(state, batch_size=1)[0][greedy_policy_action]
-        return old_state, target.reshape((1,-1))
+        return target.reshape((1,-1))
