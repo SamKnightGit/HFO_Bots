@@ -127,10 +127,7 @@ class Deep_QLearner:
 
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
-                    if self.reward_function_name == 'sparse':
-                        reward = self.reward_function(status)
-                    else:
-                        reward = self.reward_function(old_state, action, state)
+                    reward = reward_functions.get_sparse_reward(status)
                     if action == 0:
                         print("DRIBBLE_CHOSEN with reward " + str(reward), flush=True, file=out_file)
                     elif action == 1:
@@ -220,10 +217,7 @@ class HL_Deep_QLearner(Deep_QLearner):
 
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
-                    if self.reward_function_name == 'sparse':
-                        reward = self.reward_function(status)
-                    else:
-                        reward = self.reward_function(old_state, action, shaped_state)
+                    reward = reward_functions.get_sparse_reward(status)
                     target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
                     self.shared_experience_list.append((old_state, target_val))
                     self.update_local_main_network()
@@ -308,10 +302,7 @@ class Discrete_Deep_QLearner(Deep_QLearner):
 
                 if action is not None and state is not None:
                     shaped_state = state.reshape((1, -1))
-                    if self.reward_function_name == 'sparse':
-                        reward = self.reward_function(status)
-                    else:
-                        reward = self.reward_function(old_state, action, shaped_state)
+                    reward = reward_functions.get_sparse_reward(status)
                     target_val = self.local_network.get_target((old_state, action, reward, shaped_state, True))
                     self.shared_experience_list.append((old_state, target_val))
                     self.update_local_main_network()
