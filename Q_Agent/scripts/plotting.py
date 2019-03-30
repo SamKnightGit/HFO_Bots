@@ -44,12 +44,16 @@ def add_lineplot(file_name, label, axis=None):
         df = get_data_from_files(file_name)
         df = df.reset_index()
         df = df.melt('index', var_name='cols', value_name='vals')
-        lineplot = sns.lineplot(x='index', y='vals', ci="sd", data=df.reset_index(), ax=axis, label=label)
+        print(df)
+        lineplot = sns.lineplot(x='index', y='vals', ci="sd", marker='x', markeredgecolor='red',
+                                color='red', data=df.reset_index(), ax=axis, label=label)
         return lineplot
     df = get_data_from_files(file_name)
     df = df.reset_index()
     df = df.melt('index', var_name='cols', value_name='vals')
-    lineplot = sns.lineplot(x='index', y='vals', ci="sd", data=df.reset_index(), label=label)
+    print(df)
+    lineplot = sns.lineplot(x='index', y='vals', ci="sd", marker='x', markeredgecolor='blue',
+                            color='blue', data=df.reset_index(), label=label)
     return lineplot
 
 
