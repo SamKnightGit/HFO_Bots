@@ -27,6 +27,8 @@ def get_last_value_float(line):
 
 def get_goal_percentage(trial_line, goal_line):
     trials = get_last_value_float(trial_line)
+    if trials != 1000:
+        return 0
     goals = get_last_value_float(goal_line)
     try:
         return goals / trials
@@ -50,11 +52,15 @@ if __name__ == '__main__':
             if len(goal_percentages) == 0:
                 continue
             max_goal_percentage = max(goal_percentages)
+            if max_goal_percentage == 1.0:
+                print("1 ENCOUNTERED!")
+                print("RUN: " + str(run))
+                print(goal_percentages)
             if max_goal_percentage > max_goal:
                 max_goal = max_goal_percentage
                 goal_percentages = np.array(goal_percentages)
                 frames_to_goal = frames_per_goal[np.argmax(goal_percentages)]
-        print(max_goal)
+        print("Max GSP:  " + str(max_goal))
         print(frames_to_goal)
         print("*************************")
 
