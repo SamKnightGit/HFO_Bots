@@ -27,9 +27,9 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
 @click.command()
 @click.option('--num_agents', '-na', default=2)
 @click.option('--num_opponents', '-no', default=2)
-@click.option('--num_iterations', '-n', default=4,
+@click.option('--num_trials', '-t', default=4,
               help="The number of training iterations to run the bots on.")
-@click.option('--trials_per_iteration', '-t', default=50000,
+@click.option('--iterations_per_trial', '-i', default=50000,
               help="The number of trials (games) of HFO in each iteration.")
 @click.option('--port', '-p', default=6000,
               help="Port which main HFO server will run on.")
@@ -49,15 +49,15 @@ TEST_Q_AGENT_PATH = './example/custom_agents/HFO_Bots/Q_Agent/q_agent_testing.py
               help="Flag to indicate whether only training will occur.")
 @click.option('--num_repeated_runs', '-rr', default=0,
               help="Number of complete training runs to execute.")
-@click.option('--num_test_trials', '-tt', default=0,
-              help="Number of test trials to run for each iteration."
+@click.option('--num_test_iterations', '-ti', default=0,
+              help="Number of test iterations to run for each trial."
                    "Defaults to number train iterations when not set.")
 @click.option('--continue_run', '-cr', default=0,
               help="Run to continue from.")
-def train(num_agents, num_opponents, num_iterations, trials_per_iteration, port,
+def train(num_agents, num_opponents, num_trials, iterations_per_trial, port,
           epsilon_start, epsilon_final, learning_rate, q_table_directory,
           output_directory, logging_directory, train_only, num_repeated_runs,
-          num_test_trials, continue_run):
+          num_test_iterations, continue_run):
     if not continue_run:
         vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
                     "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+"/"
@@ -75,12 +75,12 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration, port,
         logging_dir = os.path.join(logging_directory, 'run_' + str(run_index))
         os.makedirs(logging_dir, exist_ok=True)
 
-        epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
+        epsilon_reduce_value = (epsilon_start - epsilon_final) / num_trials
 
-        if num_test_trials == 0:
-            num_test_trials = trials_per_iteration
+        if num_test_iterations == 0:
+            num_test_iterations = iterations_per_trial
 
-        for iteration in tqdm(range(0, num_iterations)):
+        for iteration in tqdm(range(0, num_trials)):
             in_q_table_path = None
             if iteration != 0:
                 in_q_table_path = os.path.join(q_table_dir, "iter_" + str(iteration-1)) # type: str
@@ -98,7 +98,7 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration, port,
 
             with open(output_file_name, 'w+') as output_file:
                 hfo_process = start_hfo_server(
-                    num_agents, num_opponents, trials_per_iteration, output_file, port
+                    num_agents, num_opponents, iterations_per_trial, output_file, port
                 )
 
                 log_file_names = []
@@ -113,7 +113,7 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration, port,
                 for agent_index in range(0, num_agents):
                     log_file = open_log_files[agent_index]
                     start_player(
-                        num_agents-1, num_opponents, agent_index, trials_per_iteration, log_file,
+                        num_agents-1, num_opponents, agent_index, iterations_per_trial, log_file,
                         epsilon_value, learning_rate, in_q_table_path, out_q_table_path, port=port
                     )
                     time.sleep(10)
@@ -126,15 +126,15 @@ def train(num_agents, num_opponents, num_iterations, trials_per_iteration, port,
 
         if not train_only:
             test(
-                num_agents, num_opponents, num_iterations, num_test_trials,
+                num_agents, num_opponents, num_trials, num_test_iterations,
                 q_table_dir, output_dir, port
             )
-        #plot_data(output_directory, vars_string, num_iterations, trials_per_iteration)
+        #plot_data(output_directory, vars_string, num_trials, iterations_per_trial)
 
 
-def test(num_agents, num_opponents, num_iterations, num_test_trials,
+def test(num_agents, num_opponents, num_trials, num_test_iterations,
          q_table_directory, output_directory, port):
-    for iteration in tqdm(range(0, num_iterations)):
+    for iteration in tqdm(range(0, num_trials)):
         in_q_table_path = q_table_directory + "/iter_" + str(iteration)
 
         output_file_name = os.path.join(output_directory,
@@ -142,13 +142,13 @@ def test(num_agents, num_opponents, num_iterations, num_test_trials,
 
         with open(output_file_name, "w+") as output_file:
             hfo_process = start_hfo_server(
-                num_agents, num_opponents, num_test_trials, output_file, port=port
+                num_agents, num_opponents, num_test_iterations, output_file, port=port
             )
 
             for agent_index in range(0, num_agents):
                 start_player(
                     num_agents-1, num_opponents, agent_index,
-                    num_test_trials, in_q_table_path=in_q_table_path,
+                    num_test_iterations, in_q_table_path=in_q_table_path,
                     testing=True, port=port
                 )
                 time.sleep(10)
@@ -182,7 +182,7 @@ def start_hfo_server(num_agents, num_opponents, num_trials, output_file: typing.
 
 
 def start_player(num_teammates, num_opponents, agent_index,
-                 trials_per_iteration, log_file:typing.IO=subprocess.DEVNULL,
+                 iterations_per_trial, log_file:typing.IO=subprocess.DEVNULL,
                  epsilon_value=0.0, learning_rate=0.0, in_q_table_path=None,
                  out_q_table_path=None, testing=False, port=6000):
     if testing:
@@ -192,7 +192,7 @@ def start_player(num_teammates, num_opponents, agent_index,
                                '--numOpponents=' + str(num_opponents),
                                '--playerIndex=' + str(agent_index + 1),
                                '--qTableDir=' + in_q_table_path + "/q_learner",
-                               '--numEpisodes=' + str(trials_per_iteration)],
+                               '--numEpisodes=' + str(iterations_per_trial)],
                          stdout=log_file)
 
     else:
@@ -204,7 +204,7 @@ def start_player(num_teammates, num_opponents, agent_index,
                                    '--playerIndex=' + str(agent_index + 1),
                                    '--inQTableDir=' + in_q_table_path + "/q_learner",
                                    '--outQTableDir=' + out_q_table_path + "/q_learner",
-                                   '--numEpisodes=' + str(trials_per_iteration),
+                                   '--numEpisodes=' + str(iterations_per_trial),
                                    '--learningRate=' + str(learning_rate),
                                    '--epsilon=' + str(epsilon_value)],
                              stdout=log_file)
@@ -215,7 +215,7 @@ def start_player(num_teammates, num_opponents, agent_index,
                                    '--numOpponents=' + str(num_opponents),
                                    '--playerIndex=' + str(agent_index + 1),
                                    '--outQTableDir=' + out_q_table_path + "/q_learner",
-                                   '--numEpisodes=' + str(trials_per_iteration),
+                                   '--numEpisodes=' + str(iterations_per_trial),
                                    '--learningRate=' + str(learning_rate),
                                    '--epsilon=' + str(epsilon_value)],
                              stdout=log_file)
