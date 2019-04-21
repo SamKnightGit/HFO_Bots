@@ -50,8 +50,8 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
               help="Final epsilon value.")
 @click.option('--num_agents', '-tm', default=2)
 @click.option('--num_opponents', '-op', default=2)
-@click.option('--trials_per_iteration', '-t', default=5)
-@click.option('--num_iterations', '-n', default=1)
+@click.option('--iterations_per_trial', '-i', default=5)
+@click.option('--num_trials', '-t', default=1)
 @click.option('--num_parallel_games', '-pg', default=3)
 @click.option('--save_network_dir', '-ns', default=base_network_dir)
 @click.option('--load_network_dir', '-nl', default=base_network_dir)
@@ -66,14 +66,14 @@ base_logging_dir = os.path.join(base_logging_dir, creation_time)
               help="Iteration to start training from if continuing.")
 @click.option('--num_repeated_runs', '-rr', default=1,
               help="Number of complete training runs to execute.")
-@click.option('--num_test_trials', '-tt', default=0,
-              help="Number of test trials to run for each iteration."
+@click.option('--num_test_iterations', '-ti', default=0,
+              help="Number of test iterations to run for each trial."
                    "Defaults to number train iterations when not set.")
 def run_training(port, seed, vary_seed, double_q, reward_function, state_space, learning_rate,
-                 epsilon_start, epsilon_final, num_agents, num_opponents, trials_per_iteration,
-                 num_iterations, num_parallel_games, save_network_dir, load_network_dir,
+                 epsilon_start, epsilon_final, num_agents, num_opponents, iterations_per_trial,
+                 num_trials, num_parallel_games, save_network_dir, load_network_dir,
                  logging_dir, output_dir, train_only, continue_training, start_iteration,
-                 num_repeated_runs, num_test_trials):
+                 num_repeated_runs, num_test_iterations):
 
     if not continue_training:
         vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
@@ -93,12 +93,12 @@ def run_training(port, seed, vary_seed, double_q, reward_function, state_space, 
 
         experience_list = []
 
-        epsilon_reduce_value = (epsilon_start - epsilon_final) / num_iterations
+        epsilon_reduce_value = (epsilon_start - epsilon_final) / num_trials
 
-        if num_test_trials > 0:
+        if num_test_iterations > 0:
             train_only = False
 
-        num_test_trials = trials_per_iteration
+        num_test_iterations = iterations_per_trial
 
         num_teammates = num_agents - 1
 
@@ -120,7 +120,7 @@ def run_training(port, seed, vary_seed, double_q, reward_function, state_space, 
                 state_dimensions, learning_rate, num_teammates
             )
 
-        for iteration in trange(int(start_iteration), int(num_iterations)):
+        for iteration in trange(int(start_iteration), int(num_trials)):
 
             save_net_dir = os.path.join(save_net_parent_dir, 'iter_' + str(iteration))
             os.makedirs(save_net_dir, exist_ok=True)
@@ -144,17 +144,17 @@ def run_training(port, seed, vary_seed, double_q, reward_function, state_space, 
                     if state_space == 'hl':
                         deep_learner = HL_Deep_QLearner(
                             global_network, reward_function, experience_list, unique_port, double_q,
-                            learning_rate, epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                            learning_rate, epsilon_value, iterations_per_trial, num_teammates, num_opponents
                         )
                     elif state_space == 'll':
                         deep_learner = Deep_QLearner(
                             global_network, reward_function, experience_list, unique_port, double_q,
-                            learning_rate, epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                            learning_rate, epsilon_value, iterations_per_trial, num_teammates, num_opponents
                         )
                     else:
                         deep_learner = Discrete_Deep_QLearner(
                             global_network, reward_function, experience_list, unique_port, double_q,
-                            learning_rate, epsilon_value, trials_per_iteration, num_teammates, num_opponents
+                            learning_rate, epsilon_value, iterations_per_trial, num_teammates, num_opponents
                         )
                     print("Agent " + str(agent_index) +
                         " connected for game: " + str(game_index))
@@ -174,7 +174,7 @@ def run_training(port, seed, vary_seed, double_q, reward_function, state_space, 
                                                     '--offense-agents='+str(num_agents),
                                                     '--defense-npcs='+str(num_opponents),
                                                     '--offense-on-ball', '1',
-                                                    '--trials', str(trials_per_iteration),
+                                                    '--trials', str(iterations_per_trial),
                                                     '--port', str(unique_port),
                                                     '--seed', str(unique_seed),
                                                     '--headless',
@@ -225,7 +225,7 @@ def run_training(port, seed, vary_seed, double_q, reward_function, state_space, 
         if not train_only:
             run_testing(
                 load_net_dir, out_parent_dir, port, num_agents, num_opponents,
-                num_iterations, num_test_trials, state_space
+                num_trials, num_test_iterations, state_space
             )
 
 
