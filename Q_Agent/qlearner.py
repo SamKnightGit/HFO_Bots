@@ -61,7 +61,6 @@ class QLearner:
 
         return np.argmax(self.q_table[state])
 
-
     def clear(self):
         self.old_state = None
 
