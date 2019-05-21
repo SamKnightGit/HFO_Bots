@@ -12,7 +12,7 @@ from agent_thread import Player_Thread
 @click.option('--port', '-p', default=6000)
 @click.option('--num_agents', '-tm', default=2)
 @click.option('--num_opponents', '-op', default=2)
-@click.option('--iteration_num', '-i', default=1)
+@click.option('--iteration_num', '-i', default=0)
 @click.option('--num_test_trials', '-tt', default=5)
 @click.option('--state_space', '-ss', default='d',
               type=click.Choice(['d', 'hl', 'll']))

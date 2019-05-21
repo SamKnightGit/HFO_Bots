@@ -3,6 +3,7 @@ import numpy as np
 from hfo import GOAL, CAPTURED_BY_DEFENSE, OUT_OF_BOUNDS, OUT_OF_TIME
 
 goal_position = np.array([1.0, 0.0])
+
 max_distance_from_goal = np.linalg.norm(
     np.array([-1.0, 1.0]) - goal_position
 )
@@ -40,6 +41,7 @@ def hl_simple_reward(old_state, action, state):
     if _in_scoring_zone(old_state):
         return -0.49 + _scoring_reward(action)
     return -0.99 + _distance_reward(state)
+    # return -0.99 + _distance_reward_pass(state)
 
 
 def _scoring_reward(action):
@@ -62,6 +64,11 @@ def _distance_reward(state):
     distance_ratio = (new_goal_dist / max_distance_from_goal) * 0.50
     return 0.50 - distance_ratio
 
+def _distance_reward_pass(state):
+    new_ball_position = np.array([state[3], state[4]])
+    new_goal_dist = np.linalg.norm(new_ball_position - goal_position)
+    distance_ratio = (new_goal_dist / max_distance_from_goal)
+    return 1.0 - distance_ratio
 
 def hl_advanced_reward(old_state, action, state):
     pass

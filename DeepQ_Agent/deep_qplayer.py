@@ -29,7 +29,6 @@ class Deep_QPlayer:
                 num_teammates=self.num_teammates
             )
 
-
     def connect(self):
         hfo_env = HFOEnvironment()
         hfo_env.connectToServer(feature_set=LOW_LEVEL_FEATURE_SET, server_port=self.port)
