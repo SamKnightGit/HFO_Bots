@@ -1,11 +1,16 @@
 import numpy as np
+from hfo import *
+from util.helpers import get_reward, reward_printer
+import state_representer
 
 
 class QLearner:
-    def __init__(self, num_states=0, num_actions=0, epsilon=0.10, learning_rate=0.10,
-                 discount_factor=0.9, q_table_in=None, q_table_out=None):
+    def __init__(self, num_states, num_actions, num_teammates, num_opponents, port, num_episodes,
+                 epsilon=0.10, learning_rate=0.10, discount_factor=0.9, q_table_in=None, q_table_out=None):
         self.num_states = num_states
         self.num_actions = num_actions
+        self.num_teammates = num_teammates
+        self.num_opponents = num_opponents
         self.epsilon = epsilon
         self.learn_rate = learning_rate
         self.discount = discount_factor
@@ -15,6 +20,10 @@ class QLearner:
         else:
             self.q_table = np.zeros((num_states, num_actions))
         self.old_state = None
+
+        self.hfo_env = None
+        self.port = port
+        self.num_episodes = num_episodes
 
     def update(self, state, action, reward):
         if self.old_state:
@@ -60,6 +69,77 @@ class QLearner:
             return action
 
         return np.argmax(self.q_table[state])
+
+    def connect(self):
+        hfo_env = HFOEnvironment()
+        hfo_env.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=self.port)
+        self.hfo_env = hfo_env
+
+    def run_episodes(self, output_file):
+        if not self.hfo_env:
+            raise(ValueError, "HFO Environment not detected, must call 'connect' before calling 'run_episodes'")
+
+        with open(output_file, 'w+') as out_file:
+            for episode in range(0, self.num_episodes):
+                status = IN_GAME
+                action = None
+                state = None
+                history = []
+                while status == IN_GAME:
+                    features = self.hfo_env.getState()
+                    # Print off features in a readable manner
+                    # feature_printer(features, args.numTeammates, args.numOpponents)
+
+                    if int(features[5]) != 1:
+                        history.append((features[0], features[1]))
+                        if len(history) > 5:
+                            history.pop(0)
+
+                        # ensures agent does not get stuck for prolonged periods
+                        if len(history) == 5:
+                            if history[0][0] == history[4][0] and history[0][1] == history[4][1]:
+                                self.hfo_env.act(REORIENT)
+                                history = []
+                                continue
+
+                        self.hfo_env.act(MOVE)
+                    else:
+                        state, valid_teammates = state_representer.get_representation(features, args.numTeammates)
+                        print("Valid Teammates: ", valid_teammates)
+                        if 0 in valid_teammates:
+                            self.set_invalid(state, valid_teammates)
+
+                        if action is not None:
+                            reward = get_reward(status)
+                            reward_printer(state, action, reward)
+                            self.update(state, action, reward)
+
+                        action = self.get_action(state, valid_teammates)
+
+                        if action == 0:
+                            print("Action Taken: DRIBBLE \n")
+                            self.hfo_env.act(DRIBBLE)
+                        elif action == 1:
+                            print("Action Taken: SHOOT \n")
+                            self.hfo_env.act(SHOOT)
+                        elif action > 1:
+                            print("Action Taken: PASS -> {0} \n".format(action - 2))
+                            self.hfo_env.act(PASS, features[15 + 6 * (action - 2)])
+                    status = self.hfo_env.step()
+
+                if action is not None and state is not None:
+                    reward = get_reward(status)
+                    reward_printer(state, action, reward)
+                    self.update(state, action, reward)
+                    self.clear()
+                    self.save()
+
+                if status == SERVER_DOWN:
+                    self.hfo_env.act(QUIT)
+                    self.save()
+                    break
+
+            self.save()
 
     def clear(self):
         self.old_state = None
