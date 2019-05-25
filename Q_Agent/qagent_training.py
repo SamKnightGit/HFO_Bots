@@ -1,188 +1,150 @@
+#!/usr/bin/env python3.5
+
 from hfo import *
-import argparse
-import os
+from datetime import datetime
+from os import path
+from tqdm import trange
+from qagent_testing import run_testing
 from qlearner import QLearner
-import state_representer
+from agent_thread import Agent_Thread
+from util.clean import clean_keep_lines
+from util.helpers import start_hfo_server
+
+import time
+import click
 
 
-# Taken from: high_level_sarsa_agent.py in HFO repo
-def get_reward(s):
-    reward = 0
+creation_time = datetime.isoformat(datetime.today())
 
-    if s == GOAL:
-        reward = 1
+base_qtable_dir = path.join(path.dirname(path.realpath(__file__)), 'qtables')
+base_qtable_dir = path.join(base_qtable_dir, creation_time)
 
-    elif s == CAPTURED_BY_DEFENSE:
-        reward = -1
+base_output_dir = path.join(path.dirname(path.realpath(__file__)), 'output')
+base_output_dir = path.join(base_output_dir, creation_time)
 
-    elif s == OUT_OF_BOUNDS:
-        reward = -1
-
-    elif s == OUT_OF_TIME:
-        reward = -1
-
-    return reward
+base_logging_dir = path.join(path.dirname(path.realpath(__file__)), 'logs')
+base_logging_dir = path.join(base_logging_dir, creation_time)
 
 
-def reward_printer(state, action, reward):
-    if action == 0:
-        print("Dribble Action with reward {0} on state {1}".format(
-            reward, state
-        ))
-    elif action == 1:
-        print("Shoot Action with reward {0} on state {1}".format(
-            reward, state
-        ))
-    else:
-        print("Pass Action with reward {0} on state {1}".format(
-            reward, state
-        ))
+@click.command()
+@click.option('--num_agents', '-na', default=2)
+@click.option('--num_opponents', '-no', default=2)
+@click.option('--num_training_set', '-t', default=4,
+              help="The number of training sets to run the bots on."
+                   "Training set defines when checkpoints of agents internal state is taken.")
+@click.option('--episodes_per_set', '-e', default=50000,
+              help="The number of episodes (games) of HFO in each trial.")
+@click.option('--port', '-p', default=6000,
+              help="Port which main HFO server will run on.")
+@click.option('--epsilon_start', '-es', default=0.1,
+              help="Initial epsilon value.")
+@click.option('--epsilon_final', '-ef', default=0.0,
+              help="Final epsilon value.")
+@click.option('--learning_rate', '-lr', default=0.1,
+              help="Learning rate of agents.")
+@click.option('--qtable_directory', '-d', default=base_qtable_dir,
+              help="Path to directory where q tables will be stored.")
+@click.option('--output_directory', '-o', default=base_output_dir,
+              help="Path to directory where output files will be stored.")
+@click.option('--logging_directory', '-o', default=base_logging_dir,
+              help="Path to directory where training logs will be stored.")
+@click.option('--train_only', '-to', default=0,
+              help="Flag to indicate whether only training will occur.")
+@click.option('--num_repeated_runs', '-rr', default=1,
+              help="Number of complete training runs to execute.")
+@click.option('--num_test_episodes', '-ti', default=0,
+              help="Number of test episodes to run for each trial."
+                   "Defaults to number train episodes when not set.")
+@click.option('--continue_run', '-cr', default=0,
+              help="Run to continue from.")
+def run_training(num_agents, num_opponents, num_training_set, episodes_per_set, port,
+                 epsilon_start, epsilon_final, learning_rate, qtable_directory,
+                 output_directory, logging_directory, train_only, num_repeated_runs,
+                 num_test_episodes, continue_run):
 
+    num_states = 32 * (54 ** (num_agents - 1))
+    num_actions = 2 + (num_agents - 1)
+    
+    if not continue_run:
+        vars_string = "_agents"+str(num_agents)+"_opponents"+str(num_opponents)+ \
+                    "_eps"+str(epsilon_start)+"_lr"+str(learning_rate)+"/"
+        qtable_directory += vars_string
+        output_directory += vars_string
+        logging_directory += vars_string
 
-def feature_printer(features, numTeammates, numOpponents):
-    print("Player X Position: {0:.5f}".format(features[0]))
-    print("Player Y Position: {0:.5f}".format(features[1]))
-    print("Player Orientation: {0:.5f}".format(features[2]))
-    print("Ball X Position: {0:.5f}".format(features[3]))
-    print("Ball Y Position: {0:.5f}".format(features[4]))
-    print("Able to kick: {0}".format(features[5]))
-    print("Goal Center Proximity {0:.5f}".format(features[6]))
-    print("Goal Center Angle: {0:.5f}".format(features[7]))
-    print("Goal Opening Angle: {0:.5f}".format(features[8]))
-    print("Proximity to Opponent: {0:.5f}".format(features[9]))
-    for teammate in range(numTeammates):
-        print("Teammate {0} Goal Opening Angle: {1:.5f}".format(
-            teammate, features[10+6*teammate]))
-        print("Teammate {0} Opponent Proximity: {1:.5f}".format(
-            teammate, features[11 + 6 * teammate]))
-        print("Teammate {0} Pass Opening Angle: {1:.5f}".format(
-            teammate, features[12 + 6 * teammate]))
-        print("Teammate {0} X Position: {1:.5f}".format(
-            teammate, features[13 + 6 * teammate]))
-        print("Teammate {0} Y Position: {1:.5f}".format(
-            teammate, features[14 + 6 * teammate]))
-        print("Teammate {0} Shirt Number: {1:.5f}".format(
-            teammate, features[15 + 6 * teammate]))
-    for opponent in range(numOpponents):
-        print("Opponent {0} X Position: {1:.5f}".format(
-            opponent, features[10 + 6 * numTeammates + 3 * opponent]))
-        print("Opponent {0} Y Position: {1:.5f}".format(
-            opponent, features[11 + 6 * numTeammates + 3 * opponent]))
-        print("Opponent {0} Shirt Number: {1:.5f}".format(
-            opponent, features[12 + 6 * numTeammates + 3 * opponent]))
-    print("\n\n")
+    for run_index in trange(int(continue_run), int(num_repeated_runs)):
+        run_qtable_dir = path.join(qtable_directory, 'run_' + str(run_index))
+        os.makedirs(run_qtable_dir, exist_ok=True)
 
+        output_dir = path.join(output_directory, 'run_' + str(run_index))
+        os.makedirs(output_dir, exist_ok=True)
 
+        logging_dir = path.join(logging_directory, 'run_' + str(run_index))
+        os.makedirs(logging_dir, exist_ok=True)
+
+        epsilon_reduce_value = (epsilon_start - epsilon_final) / num_training_set
+
+        if num_test_episodes == 0:
+            num_test_episodes = episodes_per_set
+
+        for train_set in trange(0, num_training_set):
+            in_q_table_path = None
+            if train_set != 0:
+                in_q_table_path = path.join(run_qtable_dir, "iter_" + str(train_set-1)) # type: str
+            out_q_table_path = path.join(run_qtable_dir, "iter_" + str(train_set))  # type: str
+            os.mkdir(out_q_table_path)
+
+            # initialize q table files
+            for i in range(1, num_agents + 1):
+                open(path.join(out_q_table_path, 'q_learner' + str(i) + '.npy'), 'w+').close()
+
+            output_file_name = path.join(output_dir, 'train_iter_' + str(train_set) + '.txt')
+
+            # set epsilon value
+            epsilon_value = epsilon_start - (train_set * epsilon_reduce_value)
+
+            print("Starting HFO Server!")
+            with open(output_file_name, 'w+') as output_file:
+                hfo_process = start_hfo_server(
+                    num_agents, num_opponents, episodes_per_set, output_file, port
+                )
+
+                agents = []
+                for agent_index in range(0, num_agents):
+                    print("Creating Learner: " + str(agent_index))
+                    input_q_table = None
+                    if in_q_table_path:
+                        input_q_table = path.join(in_q_table_path, 'q_learner' + str(agent_index + 1) + '.npy')
+                    output_q_table = path.join(out_q_table_path, 'q_learner' + str(agent_index + 1) + '.npy')
+
+                    q_learner = QLearner(num_states, num_actions, num_agents - 1, num_opponents, port,
+                                         episodes_per_set, epsilon=epsilon_value, learning_rate=learning_rate,
+                                         q_table_in=input_q_table, q_table_out=output_q_table)
+                    agents.append(q_learner)
+
+                agent_threads = []
+                for agent_index in range(0, num_agents):
+                    print("Starting Learner Thread: " + str(agent_index))
+
+                    logging_file = path.join(logging_dir, 'train_iter_' + str(train_set) +
+                                             '_player' + str(agent_index + 1) + '.txt')
+                    agent_thread = Agent_Thread(agents[agent_index], logging_file)
+                    agent_threads.append(agent_thread)
+                    agent_thread.start()
+                    time.sleep(5)
+
+                for agent in agent_threads:
+                    agent.join()
+                hfo_process.wait()
+
+            clean_keep_lines(output_dir, [output_file_name], 20)
+
+        if not train_only:
+            run_testing(
+                num_training_set, num_test_episodes, run_qtable_dir, output_dir, logging_dir,
+                num_states, num_actions, num_agents, num_opponents, port
+            )
 
 
 if __name__ == '__main__':
-    Q_TABLE_DIR = os.path.dirname(os.path.realpath(__file__)) + '/qtables/q_learner'
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=6000)
-    parser.add_argument('--numTeammates', type=int, default=1)
-    parser.add_argument('--numOpponents', type=int, default=1)
-    parser.add_argument('--numEpisodes', type=int, default=1)
-    parser.add_argument('--epsilon', type=float, default=0.10)
-    parser.add_argument('--learningRate', type=float, default=0.10)
-    parser.add_argument('--playerIndex', type=int, default=1)
-    parser.add_argument('--inQTableDir', type=str, default=None)
-    parser.add_argument('--outQTableDir', type=str, default=Q_TABLE_DIR)
-    args = parser.parse_args()
-
-
-    """ States explained as follows:
-    4 states for location in quartile                       -- 4
-    1 boolean state if quartile is near goal                -- 2
-    Goal scoring angle, SMALL or LARGE                      -- 2
-    Opponent proximity, CLOSE or FAR                        -- 2
-    For each Teammate:
-        1 boolean state if closer to goal than player       -- 2
-        Proximity to opponent, CLOSE or FAR or INVALID      -- 3
-        Pass opening angle, SMALL or LARGE or INVALID       -- 3
-        Goal scoring angle, SMALL or LARGE or INVALID       -- 3
-         
-
-    OUT proximity refers to outside of the quartile of the player
-    """
-    NUM_STATES = 32 * (54 ** args.numTeammates)
-
-    # Shoot, Dribble or Pass to one of N teammates or
-    NUM_ACTIONS = 2 + args.numTeammates
-
-    hfo = HFOEnvironment()
-    hfo.connectToServer(feature_set=HIGH_LEVEL_FEATURE_SET, server_port=args.port)
-
-    if args.inQTableDir:
-        q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                             epsilon=args.epsilon,
-                             learning_rate=args.learningRate,
-                             q_table_in=args.inQTableDir + str(args.playerIndex) + '.npy',
-                             q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
-    else:
-        q_learner = QLearner(NUM_STATES, NUM_ACTIONS,
-                             epsilon=args.epsilon,
-                             learning_rate=args.learningRate,
-                             q_table_in=args.outQTableDir + str(args.playerIndex) + '.npy',
-                             q_table_out=args.outQTableDir + str(args.playerIndex) + '.npy')
-
-    for episode in range(0, args.numEpisodes):
-        status = IN_GAME
-        action = None
-        state = None
-        history = []
-        while status == IN_GAME:
-            features = hfo.getState()
-            # Print off features in a readable manner
-            # feature_printer(features, args.numTeammates, args.numOpponents)
-
-            if int(features[5]) != 1:
-                history.append((features[0], features[1]))
-                if len(history) > 5:
-                    history.pop(0)
-
-                # ensures agent does not get stuck for prolonged periods
-                if len(history) == 5:
-                    if history[0][0] == history[4][0] and history[0][1] == history[4][1]:
-                        hfo.act(REORIENT)
-                        history = []
-                        continue
-
-                hfo.act(MOVE)
-            else:
-                state, valid_teammates = state_representer.get_representation(features, args.numTeammates)
-                print("Valid Teammates: ", valid_teammates)
-                if 0 in valid_teammates:
-                    q_learner.set_invalid(state, valid_teammates)
-
-                if action is not None:
-                    reward = get_reward(status)
-                    reward_printer(state, action, reward)
-                    q_learner.update(state, action, reward)
-
-                action = q_learner.get_action(state, valid_teammates)
-
-                if action == 0:
-                    print("Action Taken: DRIBBLE \n")
-                    hfo.act(DRIBBLE)
-                elif action == 1:
-                    print("Action Taken: SHOOT \n")
-                    hfo.act(SHOOT)
-                elif args.numTeammates > 0:
-                    print("Action Taken: PASS -> {0} \n".format(action-2))
-                    hfo.act(PASS, features[15 + 6 * (action-2)])
-            status = hfo.step()
-
-        if action is not None and state is not None:
-            reward = get_reward(status)
-            reward_printer(state, action, reward)
-            q_learner.update(state, action, reward)
-            q_learner.clear()
-            q_learner.save()
-
-        if status == SERVER_DOWN:
-            hfo.act(QUIT)
-            q_learner.save()
-            break
-            
-    q_learner.save()
+    run_training()

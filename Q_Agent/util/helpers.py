@@ -1,4 +1,19 @@
 from hfo import GOAL, CAPTURED_BY_DEFENSE, OUT_OF_BOUNDS, OUT_OF_TIME
+import subprocess
+import time
+
+
+def start_hfo_server(num_agents, num_opponents, num_training_set, output_file: typing.IO=subprocess.DEVNULL, port=6000):
+    hfo_process = subprocess.Popen(args=['./bin/HFO',
+                                         '--port=' + str(port),
+                                         '--offense-agents=' + str(num_agents),
+                                         '--defense-npcs=' + str(num_opponents),
+                                         '--offense-on-ball', '1',
+                                         '--trials', str(num_training_set),
+                                         '--headless', '--no-logging'],
+                                   stdout=output_file)
+    time.sleep(15)
+    return hfo_process
 
 
 # Taken from: high_level_sarsa_agent.py in HFO repo
